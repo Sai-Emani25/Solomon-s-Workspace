@@ -1,0 +1,7 @@
+{
+  "name": "Solomon's Daily Tools",
+  "description": "A comprehensive suite of productivity tools for file conversion, media compression, and task management with a built-in IST-based streak system.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
