@@ -14,7 +14,25 @@ View your app in AI Studio: https://ai.studio/apps/drive/1gId1xO4c_N62lIMGoiFW8y
 
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+
+2. Create a `.env.local` file from the example:
+   ```bash
+   cp .env.example .env.local
+   ```
+
+3. Set your `GEMINI_API_KEY` in `.env.local` to your Gemini API key
+
+4. Run the app:
+   ```bash
+   npm run dev
+   ```
+
+## Deployment
+
+This project is ready to deploy on multiple platforms. See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on deploying to:
+- **GitHub Pages** (Free, automated with GitHub Actions)
+- **Vercel** (Easy setup, automatic deployments)
+- **Netlify** (Simple and fast)
