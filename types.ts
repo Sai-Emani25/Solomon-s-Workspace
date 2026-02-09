@@ -33,12 +33,23 @@ export interface HubFolder {
   links: HubLink[];
 }
 
+export interface Subtask {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  completed: boolean;
+}
+
 export interface Hackathon {
   id: string;
   name: string;
   deadline: string;
   link: string;
   platform: string;
+  type: 'in-person' | 'virtual';
+  isMultistage: boolean;
+  subtasks?: Subtask[];
 }
 
 export interface StudyItem {
