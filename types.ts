@@ -39,6 +39,7 @@ export interface Subtask {
   startDate: string;
   endDate: string;
   completed: boolean;
+  status: 'todo' | 'in-progress' | 'done';
 }
 
 export interface Hackathon {

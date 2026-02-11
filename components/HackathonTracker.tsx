@@ -32,11 +32,28 @@ const HackathonTracker: React.FC = () => {
   }, [hackathons]);
 
   const addHackathon = () => {
-    if (!newItem.name || !newItem.deadline) return;
+    // Determine deadline used for sorting/display
+    let finalDeadline = newItem.deadline;
+    if (newItem.isMultistage && newItem.subtasks.length > 0) {
+        const dates = newItem.subtasks.map(s => new Date(s.endDate).getTime());
+        if (dates.length > 0) {
+            const maxDate = new Date(Math.max(...dates));
+            // Format as YYYY-MM-DD
+            const year = maxDate.getFullYear();
+            const month = String(maxDate.getMonth() + 1).padStart(2, '0');
+            const day = String(maxDate.getDate()).padStart(2, '0');
+            finalDeadline = `${year}-${month}-${day}`;
+        }
+    }
+
+    if (!newItem.name || !finalDeadline) return;
+
+    const itemToSave = { ...newItem, deadline: finalDeadline };
+
     if (editingId) {
       // Update existing hackathon
       setHackathons(
-        hackathons.map(h => h.id === editingId ? { ...newItem, id: editingId } : h)
+        hackathons.map(h => h.id === editingId ? { ...itemToSave, id: editingId } : h)
           .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
       );
       setEditingId(null);
@@ -44,7 +61,7 @@ const HackathonTracker: React.FC = () => {
       // Add new hackathon
       const hack: Hackathon = {
         id: Date.now().toString(),
-        ...newItem
+        ...itemToSave
       };
       setHackathons([...hackathons, hack].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()));
     }
@@ -76,7 +93,8 @@ const HackathonTracker: React.FC = () => {
     const subtask: Subtask = {
       id: Date.now().toString(),
       ...newSubtask,
-      completed: false
+      completed: false,
+      status: 'todo'
     };
     setNewItem({ ...newItem, subtasks: [...newItem.subtasks, subtask] });
     setNewSubtask({ name: '', startDate: '', endDate: '' });
@@ -86,13 +104,61 @@ const HackathonTracker: React.FC = () => {
     setNewItem({ ...newItem, subtasks: newItem.subtasks.filter(s => s.id !== id) });
   };
 
+  const completeStage = (hackathonId: string, subtaskId: string) => {
+    setHackathons(prevHackathons => {
+      // Find the hackathon
+      const hackathon = prevHackathons.find(h => h.id === hackathonId);
+      if (!hackathon || !hackathon.subtasks) return prevHackathons;
+
+      // Check if this is the last incomplete task
+      const sortedSubtasks = [...hackathon.subtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+      const remainingTasks = sortedSubtasks.filter(s => !s.completed && s.id !== subtaskId);
+
+      // If no remaining tasks after this one, delete the hackathon
+      if (remainingTasks.length === 0) {
+         return prevHackathons.filter(h => h.id !== hackathonId);
+      }
+
+      // Otherwise, mark this subtask as completed
+      return prevHackathons.map(h => {
+        if (h.id === hackathonId && h.subtasks) {
+          return {
+             ...h,
+             subtasks: h.subtasks.map(s => 
+               s.id === subtaskId ? { ...s, completed: true, status: 'done' } : s
+             )
+          };
+        }
+        return h;
+      });
+    });
+  };
+
   const toggleSubtask = (hackathonId: string, subtaskId: string) => {
     setHackathons(hackathons.map(h => {
       if (h.id === hackathonId && h.subtasks) {
         return {
           ...h,
           subtasks: h.subtasks.map(s => 
-            s.id === subtaskId ? { ...s, completed: !s.completed } : s
+            s.id === subtaskId ? { 
+              ...s, 
+              completed: !s.completed,
+              status: !s.completed ? 'done' : 'todo'
+            } : s
+          )
+        };
+      }
+      return h;
+    }));
+  };
+
+  const updateSubtaskStatus = (hackathonId: string, subtaskId: string, newStatus: 'todo' | 'in-progress' | 'done') => {
+    setHackathons(hackathons.map(h => {
+      if (h.id === hackathonId && h.subtasks) {
+        return {
+          ...h,
+          subtasks: h.subtasks.map(s => 
+            s.id === subtaskId ? { ...s, status: newStatus, completed: newStatus === 'done' } : s
           )
         };
       }
@@ -205,32 +271,40 @@ const HackathonTracker: React.FC = () => {
               {/* Subtasks Section - Only show if multistage */}
               {h.isMultistage && (
                 <div className="mb-6 space-y-2">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Submission Stages</p>
-                  {h.subtasks && h.subtasks.length > 0 ? (
-                  <div className="space-y-2 max-h-40 overflow-y-auto styled-scrollbar">
-                    {h.subtasks.map(subtask => (
-                      <div 
-                        key={subtask.id} 
-                        className="flex items-start gap-2 p-2 bg-slate-800/50 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
-                        onClick={() => toggleSubtask(h.id, subtask.id)}
-                      >
-                        {subtask.completed ? (
-                          <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                        ) : (
-                          <Circle className="w-4 h-4 text-slate-600 flex-shrink-0 mt-0.5" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-medium ${subtask.completed ? 'text-slate-500 line-through' : 'text-slate-300'}`}>
-                            {subtask.name}
-                          </p>
-                          <p className="text-[10px] text-slate-600">
-                            {new Date(subtask.startDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} - {new Date(subtask.endDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                          </p>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Current Submission Stage</p>
+                  {h.subtasks && h.subtasks.length > 0 ? (() => {
+                    const sortedSubtasks = [...h.subtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+                    const activeSubtask = sortedSubtasks.find(s => !s.completed);
+                    const totalStages = sortedSubtasks.length;
+                    const completedCount = sortedSubtasks.filter(s => s.completed).length;
+
+                    if (!activeSubtask) return null; // Should not happen if we auto-delete, but acts as fallback
+
+                    return (
+                        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                          <div className="flex justify-between items-start mb-3">
+                             <div>
+                                <h4 className="font-bold text-white text-md">{activeSubtask.name}</h4>
+                                <p className="text-xs text-slate-400 mt-1">Stage {completedCount + 1} of {totalStages}</p>
+                             </div>
+                             <div className="text-right">
+                                <p className="text-xs font-bold text-amber-500">Due {new Date(activeSubtask.endDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</p>
+                                <p className="text-[10px] text-slate-500 mt-1">
+                                  {Math.ceil((new Date(activeSubtask.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days left
+                                </p>
+                             </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => completeStage(h.id, activeSubtask.id)}
+                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Complete This Stage
+                          </button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                  ) : (
+                    );
+                  })() : (
                     <div className="p-2 bg-slate-800/30 rounded-lg border border-slate-800/50">
                       <p className="text-xs text-slate-600 text-center">No stages added yet</p>
                     </div>
@@ -300,6 +374,7 @@ const HackathonTracker: React.FC = () => {
                   ))}
                 </div>
               </div>
+              {!newItem.isMultistage ? (
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Deadline Date</label>
                 <input 
@@ -309,6 +384,13 @@ const HackathonTracker: React.FC = () => {
                   onChange={e => setNewItem({...newItem, deadline: e.target.value})}
                 />
               </div>
+              ) : (
+                <div className="p-4 bg-slate-800/30 rounded-xl border border-slate-800">
+                  <p className="text-sm text-slate-400">
+                    <span className="text-amber-500 font-bold">Note:</span> For multi-stage hackathons, the overall deadline will be automatically set to the date of the last submission stage.
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Platform / Organizer</label>
                 <input 
