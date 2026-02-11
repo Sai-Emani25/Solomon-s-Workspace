@@ -36,7 +36,7 @@ export interface HubFolder {
 export interface Subtask {
   id: string;
   name: string;
-  startDate: string;
+  startDate?: string;
   endDate: string;
   completed: boolean;
   status: 'todo' | 'in-progress' | 'done';

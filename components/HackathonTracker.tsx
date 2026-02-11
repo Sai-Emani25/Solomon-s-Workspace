@@ -20,7 +20,7 @@ const HackathonTracker: React.FC = () => {
     isMultistage: false,
     subtasks: [] as Subtask[]
   });
-  const [newSubtask, setNewSubtask] = useState({ name: '', startDate: '', endDate: '' });
+  const [newSubtask, setNewSubtask] = useState({ name: '', endDate: '' });
 
   useEffect(() => {
     const saved = localStorage.getItem('solomon_hackathons');
@@ -34,21 +34,26 @@ const HackathonTracker: React.FC = () => {
   const addHackathon = () => {
     // Determine deadline used for sorting/display
     let finalDeadline = newItem.deadline;
+    let subtasksToSave = newItem.subtasks;
+
     if (newItem.isMultistage && newItem.subtasks.length > 0) {
-        const dates = newItem.subtasks.map(s => new Date(s.endDate).getTime());
-        if (dates.length > 0) {
-            const maxDate = new Date(Math.max(...dates));
-            // Format as YYYY-MM-DD
-            const year = maxDate.getFullYear();
-            const month = String(maxDate.getMonth() + 1).padStart(2, '0');
-            const day = String(maxDate.getDate()).padStart(2, '0');
-            finalDeadline = `${year}-${month}-${day}`;
-        }
+        // Sort subtasks by date
+        subtasksToSave = [...newItem.subtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+        
+        // Find first incomplete task to set as current deadline
+        const activeSubtask = subtasksToSave.find(s => !s.completed);
+        const targetSubtask = activeSubtask || subtasksToSave[subtasksToSave.length - 1]; // Fallback to last if all done
+        
+        const targetDate = new Date(targetSubtask.endDate);
+        const year = targetDate.getFullYear();
+        const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+        const day = String(targetDate.getDate()).padStart(2, '0');
+        finalDeadline = `${year}-${month}-${day}`;
     }
 
     if (!newItem.name || !finalDeadline) return;
 
-    const itemToSave = { ...newItem, deadline: finalDeadline };
+    const itemToSave = { ...newItem, subtasks: subtasksToSave, deadline: finalDeadline };
 
     if (editingId) {
       // Update existing hackathon
@@ -89,15 +94,19 @@ const HackathonTracker: React.FC = () => {
   };
 
   const addSubtask = () => {
-    if (!newSubtask.name || !newSubtask.startDate || !newSubtask.endDate) return;
+    if (!newSubtask.name || !newSubtask.endDate) return;
     const subtask: Subtask = {
       id: Date.now().toString(),
       ...newSubtask,
       completed: false,
       status: 'todo'
     };
-    setNewItem({ ...newItem, subtasks: [...newItem.subtasks, subtask] });
-    setNewSubtask({ name: '', startDate: '', endDate: '' });
+    // Auto-sort subtasks by date when adding
+    const updatedSubtasks = [...newItem.subtasks, subtask].sort((a, b) => 
+      new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
+    );
+    setNewItem({ ...newItem, subtasks: updatedSubtasks });
+    setNewSubtask({ name: '', endDate: '' });
   };
 
   const removeSubtask = (id: string) => {
@@ -110,23 +119,36 @@ const HackathonTracker: React.FC = () => {
       const hackathon = prevHackathons.find(h => h.id === hackathonId);
       if (!hackathon || !hackathon.subtasks) return prevHackathons;
 
-      // Check if this is the last incomplete task
-      const sortedSubtasks = [...hackathon.subtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
-      const remainingTasks = sortedSubtasks.filter(s => !s.completed && s.id !== subtaskId);
+      // Update subtasks first
+      const newSubtasks = hackathon.subtasks.map(s => 
+         s.id === subtaskId ? { ...s, completed: true, status: 'done' as const } : s
+      );
 
-      // If no remaining tasks after this one, delete the hackathon
+      // Check remaining tasks
+      const remainingTasks = newSubtasks.filter(s => !s.completed);
+
+      // If no remaining tasks, delete the hackathon
       if (remainingTasks.length === 0) {
          return prevHackathons.filter(h => h.id !== hackathonId);
       }
 
-      // Otherwise, mark this subtask as completed
+      // Calculate new deadline based on next uncompleted task
+      const sortedSubtasks = [...newSubtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+      const nextTask = sortedSubtasks.find(s => !s.completed);
+      
+      let newDeadline = hackathon.deadline;
+      if (nextTask) {
+           const d = new Date(nextTask.endDate);
+           newDeadline = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      }
+
+      // Return updated hackathons
       return prevHackathons.map(h => {
-        if (h.id === hackathonId && h.subtasks) {
+        if (h.id === hackathonId) {
           return {
              ...h,
-             subtasks: h.subtasks.map(s => 
-               s.id === subtaskId ? { ...s, completed: true, status: 'done' } : s
-             )
+             subtasks: newSubtasks,
+             deadline: newDeadline
           };
         }
         return h;
@@ -137,15 +159,25 @@ const HackathonTracker: React.FC = () => {
   const toggleSubtask = (hackathonId: string, subtaskId: string) => {
     setHackathons(hackathons.map(h => {
       if (h.id === hackathonId && h.subtasks) {
-        return {
-          ...h,
-          subtasks: h.subtasks.map(s => 
+        const newSubtasks = h.subtasks.map(s => 
             s.id === subtaskId ? { 
               ...s, 
               completed: !s.completed,
-              status: !s.completed ? 'done' : 'todo'
+              status: (!s.completed ? 'done' : 'todo') as 'todo' | 'done'
             } : s
-          )
+          );
+        
+        // Recalculate deadline
+        const sorted = [...newSubtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+        const active = sorted.find(s => !s.completed) || sorted[sorted.length - 1];
+         
+        const d = new Date(active.endDate);
+        const newDeadline = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+        return {
+          ...h,
+          subtasks: newSubtasks,
+          deadline: newDeadline
         };
       }
       return h;
@@ -155,11 +187,21 @@ const HackathonTracker: React.FC = () => {
   const updateSubtaskStatus = (hackathonId: string, subtaskId: string, newStatus: 'todo' | 'in-progress' | 'done') => {
     setHackathons(hackathons.map(h => {
       if (h.id === hackathonId && h.subtasks) {
+        const newSubtasks = h.subtasks.map(s => 
+          s.id === subtaskId ? { ...s, status: newStatus, completed: newStatus === 'done' } : s
+        );
+
+        // Recalculate deadline
+        const sorted = [...newSubtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+        const active = sorted.find(s => !s.completed) || sorted[sorted.length - 1];
+         
+        const d = new Date(active.endDate);
+        const newDeadline = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
         return {
           ...h,
-          subtasks: h.subtasks.map(s => 
-            s.id === subtaskId ? { ...s, status: newStatus, completed: newStatus === 'done' } : s
-          )
+          subtasks: newSubtasks,
+          deadline: newDeadline
         };
       }
       return h;
@@ -482,25 +524,14 @@ const HackathonTracker: React.FC = () => {
                     onChange={e => setNewSubtask({...newSubtask, name: e.target.value})}
                     placeholder="e.g., Proposal Submission"
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-slate-600 uppercase mb-1 block">Start Date</label>
-                      <input 
-                        type="date"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        value={newSubtask.startDate}
-                        onChange={e => setNewSubtask({...newSubtask, startDate: e.target.value})}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-600 uppercase mb-1 block">End Date</label>
-                      <input 
-                        type="date"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        value={newSubtask.endDate}
-                        onChange={e => setNewSubtask({...newSubtask, endDate: e.target.value})}
-                      />
-                    </div>
+                  <div className="mb-2">
+                    <label className="text-[10px] text-slate-600 uppercase mb-1 block">Deadline Date</label>
+                    <input 
+                      type="date"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      value={newSubtask.endDate}
+                      onChange={e => setNewSubtask({...newSubtask, endDate: e.target.value})}
+                    />
                   </div>
                   <button
                     type="button"
@@ -519,7 +550,7 @@ const HackathonTracker: React.FC = () => {
                         <div className="flex-1">
                           <p className="text-sm font-medium text-white">{subtask.name}</p>
                           <p className="text-xs text-slate-500">
-                            {new Date(subtask.startDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} - {new Date(subtask.endDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                             Due {new Date(subtask.endDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         </div>
                         <button
