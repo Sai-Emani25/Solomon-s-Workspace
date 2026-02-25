@@ -51,6 +51,7 @@ export interface Hackathon {
   type: 'in-person' | 'virtual';
   isMultistage: boolean;
   subtasks?: Subtask[];
+  studyMaterialLink?: string;
 }
 
 export interface StudyItem {

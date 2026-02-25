@@ -18,7 +18,8 @@ const HackathonTracker: React.FC = () => {
     platform: '', 
     type: 'virtual' as 'in-person' | 'virtual',
     isMultistage: false,
-    subtasks: [] as Subtask[]
+    subtasks: [] as Subtask[],
+    studyMaterialLink: ''
   });
   const [newSubtask, setNewSubtask] = useState({ name: '', endDate: '' });
 
@@ -82,7 +83,8 @@ const HackathonTracker: React.FC = () => {
       platform: hackathon.platform,
       type: hackathon.type,
       isMultistage: hackathon.isMultistage,
-      subtasks: hackathon.subtasks || []
+      subtasks: hackathon.subtasks || [],
+      studyMaterialLink: hackathon.studyMaterialLink || ''
     });
     setLinkType(hackathon.link ? 'submit' : 'in-person');
     setEditingId(hackathon.id);
@@ -119,22 +121,17 @@ const HackathonTracker: React.FC = () => {
       const hackathon = prevHackathons.find(h => h.id === hackathonId);
       if (!hackathon || !hackathon.subtasks) return prevHackathons;
 
-      // Update subtasks first
-      const newSubtasks = hackathon.subtasks.map(s => 
-         s.id === subtaskId ? { ...s, completed: true, status: 'done' as const } : s
-      );
+      // Remove the completed subtask
+      const newSubtasks = hackathon.subtasks.filter(s => s.id !== subtaskId);
 
-      // Check remaining tasks
-      const remainingTasks = newSubtasks.filter(s => !s.completed);
-
-      // If no remaining tasks, delete the hackathon
-      if (remainingTasks.length === 0) {
+      // If no remaining tasks, delete the entire hackathon
+      if (newSubtasks.length === 0) {
          return prevHackathons.filter(h => h.id !== hackathonId);
       }
 
-      // Calculate new deadline based on next uncompleted task
+      // Calculate new deadline based on next task
       const sortedSubtasks = [...newSubtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
-      const nextTask = sortedSubtasks.find(s => !s.completed);
+      const nextTask = sortedSubtasks[0];
       
       let newDeadline = hackathon.deadline;
       if (nextTask) {
@@ -370,6 +367,18 @@ const HackathonTracker: React.FC = () => {
                   Attending In Person
                 </div>
               )}
+
+              {h.studyMaterialLink && (
+                <a 
+                  href={h.studyMaterialLink.startsWith('http') ? h.studyMaterialLink : `https://${h.studyMaterialLink}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center justify-center gap-2 text-sm transition-all"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Study Materials
+                </a>
+              )}
             </div>
           );
         })}
@@ -440,6 +449,15 @@ const HackathonTracker: React.FC = () => {
                   value={newItem.platform}
                   onChange={e => setNewItem({...newItem, platform: e.target.value})}
                   placeholder="e.g., Devpost, Unstop"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Study Material Link (Optional)</label>
+                <input 
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  value={newItem.studyMaterialLink}
+                  onChange={e => setNewItem({...newItem, studyMaterialLink: e.target.value})}
+                  placeholder="Link to learning resources or tutorials (optional)"
                 />
               </div>
               <div>
@@ -573,7 +591,7 @@ const HackathonTracker: React.FC = () => {
                   setIsAdding(false);
                   setEditingId(null);
                   setLinkType('submit');
-                  setNewItem({ name: '', deadline: '', link: '', platform: '', type: 'virtual', isMultistage: false, subtasks: [] });
+                  setNewItem({ name: '', deadline: '', link: '', platform: '', type: 'virtual', isMultistage: false, subtasks: [], studyMaterialLink: '' });
                 }}
                 className="flex-1 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold hover:bg-slate-700 transition-colors"
               >
