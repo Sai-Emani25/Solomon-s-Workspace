@@ -51,14 +51,14 @@ export interface Hackathon {
   type: 'in-person' | 'virtual';
   isMultistage: boolean;
   subtasks?: Subtask[];
-  studyMaterialLink?: string;
 }
 
 export interface StudyItem {
   id: string;
   name: string;
   progress: number; // 0 to 100
-  topics: { id: string; name: string; completed: boolean }[];
+  link?: string; // Study resource link for the course
+  topics: { id: string; name: string; completed: boolean; link?: string }[];
 }
 
 export type AppTab = 'hub' | 'tools' | 'app-maker' | 'hackathons' | 'study';
