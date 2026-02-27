@@ -88,9 +88,13 @@ const App: React.FC = () => {
 
         <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-slate-800 bg-slate-900/50">
           <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-4">Quick Links</p>
-          <div className="space-y-3">
-             <a href="https://sai-emani25.github.io/Portfolio/" target="_blank" rel="noreferrer" className="block text-xs text-slate-400 hover:text-white transition-colors">Developer Portfolio</a>
-             <a href="https://sai-emani25.github.io/Solomon-s-Order/" target="_blank" rel="noreferrer" className="block text-xs text-slate-400 hover:text-white transition-colors">Solomon's Order</a>
+          <div className="space-y-2 flex flex-col">
+            <a href="https://sai-emani25.github.io/Portfolio/" target="_blank" rel="noreferrer" className="block text-xs text-slate-400 hover:text-white transition-colors truncate">
+              Developer Portfolio
+            </a>
+            <a href="https://sai-emani25.github.io/Solomon-s-Order/" target="_blank" rel="noreferrer" className="block text-xs text-slate-400 hover:text-white transition-colors truncate">
+              Solomon's Order
+            </a>
           </div>
         </div>
       </aside>
