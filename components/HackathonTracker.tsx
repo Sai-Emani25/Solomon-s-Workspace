@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trophy, Calendar, ExternalLink, Plus, Trash2, Clock, AlertCircle, Filter, Edit2, CheckCircle, Circle } from 'lucide-react';
+import { Trophy, Calendar, ExternalLink, Plus, Trash2, Clock, AlertCircle, Filter, Edit2, CheckCircle, Circle, Search, X } from 'lucide-react';
 import { Hackathon, Subtask } from '../types';
 
 type FilterType = 'all' | 'in-person' | 'virtual';
@@ -10,6 +10,7 @@ const HackathonTracker: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [linkType, setLinkType] = useState<'submit' | 'in-person'>('submit');
   const [newItem, setNewItem] = useState({ 
     name: '', 
@@ -203,9 +204,11 @@ const HackathonTracker: React.FC = () => {
     }));
   };
 
-  const filteredHackathons = activeFilter === 'all' 
-    ? hackathons 
-    : hackathons.filter(h => h.type === activeFilter);
+  const filteredHackathons = hackathons.filter(h => {
+    const matchesType = activeFilter === 'all' || h.type === activeFilter;
+    const matchesSearch = h.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesType && matchesSearch;
+  });
 
   const getDaysRemaining = (deadline: string) => {
     const diff = new Date(deadline).getTime() - new Date().getTime();
@@ -228,25 +231,48 @@ const HackathonTracker: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter Section */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-slate-400 text-sm">
-          <Filter className="w-4 h-4" />
-          <span className="font-bold">Filter:</span>
+      {/* Filter and Search Section */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-slate-400 text-sm">
+            <Filter className="w-4 h-4" />
+            <span className="font-bold">Filter:</span>
+          </div>
+          {(['all', 'in-person', 'virtual'] as FilterType[]).map(filter => (
+            <button
+              key={filter}
+              onClick={() => setActiveFilter(filter)}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                activeFilter === filter 
+                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' 
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+              }`}
+            >
+              {filter === 'all' ? 'All' : filter.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+            </button>
+          ))}
         </div>
-        {(['all', 'in-person', 'virtual'] as FilterType[]).map(filter => (
-          <button
-            key={filter}
-            onClick={() => setActiveFilter(filter)}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeFilter === filter 
-                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' 
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
-            }`}
-          >
-            {filter === 'all' ? 'All' : filter.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-          </button>
-        ))}
+
+        <div className="relative">
+          <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500">
+            <Search className="w-4 h-4" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search hackathons by name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-400 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -374,7 +400,11 @@ const HackathonTracker: React.FC = () => {
         {filteredHackathons.length === 0 && !isAdding && (
           <div className="col-span-full py-20 bg-slate-900/30 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-slate-500">
             <Trophy className="w-12 h-12 mb-4 opacity-20" />
-            <p>No hackathons {activeFilter !== 'all' ? `(${activeFilter})` : ''} tracked yet. Ready to build something great?</p>
+            <p>
+              {searchQuery 
+                ? `No hackathons matching "${searchQuery}" ${activeFilter !== 'all' ? `(${activeFilter})` : ''}.` 
+                : `No hackathons ${activeFilter !== 'all' ? `(${activeFilter})` : ''} tracked yet. Ready to build something great?`}
+            </p>
           </div>
         )}
       </div>
