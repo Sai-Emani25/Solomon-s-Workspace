@@ -227,11 +227,16 @@ const SolomonOrderCalendar: React.FC = () => {
               return (
                 <div
                   key={dayKey}
+                  onClick={() => {
+                    if (items.length > 0) {
+                      setExpandedDate(dayKey);
+                    }
+                  }}
                   className={`h-[76px] rounded-xl border p-1 ${
                     isCurrentMonth
                       ? 'border-slate-800 bg-slate-950'
                       : 'border-slate-900 bg-slate-950/40 opacity-45'
-                  }`}
+                  } ${items.length > 0 ? 'cursor-pointer' : ''}`}
                 >
                   <div className="mb-0.5 flex items-center justify-between">
                     <span className={`text-[11px] font-bold ${isToday ? 'text-amber-300' : 'text-slate-300'}`}>
@@ -273,10 +278,14 @@ const SolomonOrderCalendar: React.FC = () => {
                     {items.length > 2 && (
                       <button
                         type="button"
-                        onClick={() => setExpandedDate(dayKey)}
-                        className="w-full rounded-md border border-dashed border-slate-700 px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setExpandedDate(dayKey);
+                        }}
+                        className="w-full rounded-md border border-dashed border-slate-700 px-1 py-0.5 text-[8px] font-bold text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                        aria-label={`Show all items for ${dayKey}`}
                       >
-                        +{items.length - 2} more
+                        ...
                       </button>
                     )}
                   </div>
