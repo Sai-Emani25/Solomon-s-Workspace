@@ -5,12 +5,12 @@ import {
   CALENDAR_MIN_DATE,
   CALENDAR_STORAGE_KEY,
   clampMonthToCalendarRange,
-  compareDateStrings,
   formatDateInput,
   getCalendarMaxDate,
   isCalendarDateAllowed,
   parseLocalDate,
   sanitizeCalendarItems,
+  sortCalendarItems,
   sortHackathonsByDeadline,
 } from '../utils/calendarUtils';
 
@@ -97,16 +97,12 @@ const SolomonOrderCalendar: React.FC = () => {
         link: hackathon.link,
       }));
 
-    return [...sanitizeCalendarItems(manualItems), ...hackathonItems].sort((left, right) => {
-      const dateDiff = compareDateStrings(left.date, right.date);
-      if (dateDiff !== 0) return dateDiff;
-      return left.title.localeCompare(right.title);
-    });
+    return sortCalendarItems([...sanitizeCalendarItems(manualItems), ...hackathonItems]);
   }, [hackathons, manualItems]);
 
   const itemsByDate = useMemo(() => {
     return allItems.reduce<Record<string, CalendarItem[]>>((accumulator, item) => {
-      accumulator[item.date] = [...(accumulator[item.date] || []), item];
+      accumulator[item.date] = sortCalendarItems([...(accumulator[item.date] || []), item]);
       return accumulator;
     }, {});
   }, [allItems]);
@@ -208,6 +204,7 @@ const SolomonOrderCalendar: React.FC = () => {
               const dayKey = formatDateInput(day);
               const isCurrentMonth = day.getMonth() === viewMonth.getMonth();
               const items = itemsByDate[dayKey] || [];
+              const hiddenCount = Math.max(items.length - 2, 0);
               const isToday = dayKey === formatDateInput(new Date());
 
               return (
@@ -218,7 +215,7 @@ const SolomonOrderCalendar: React.FC = () => {
                       setExpandedDate(dayKey);
                     }
                   }}
-                  className={`flex h-[86px] flex-col rounded-xl border p-1.5 ${
+                  className={`flex h-[102px] flex-col rounded-xl border p-1.5 ${
                     isCurrentMonth
                       ? 'border-slate-800 bg-slate-950'
                       : 'border-slate-900 bg-slate-950/40 opacity-45'
@@ -235,18 +232,33 @@ const SolomonOrderCalendar: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex flex-1 flex-col gap-0.5 overflow-hidden">
+                  <div className="flex flex-1 flex-col gap-1 overflow-hidden">
                     {items.slice(0, 2).map((item) => (
-                      <div key={item.id} className={`group flex min-h-[22px] flex-col justify-center rounded-md px-1 py-0.5 text-[8px] font-bold leading-tight ${colorClasses[item.color]}`}>
+                      <div
+                        key={item.id}
+                        className={`group flex h-[30px] flex-col justify-center rounded-md px-1.5 py-1 text-[8px] font-bold leading-tight ${colorClasses[item.color]}`}
+                      >
                         <div className="flex items-start justify-between gap-1">
                           <div className="min-w-0">
                             <p className="truncate whitespace-nowrap">{item.title}</p>
-                            {item.source === 'hackathon' && (
-                              <span className="mt-0.5 inline-flex items-center gap-1 text-[7px] uppercase tracking-[0.1em] opacity-70">
-                                <Trophy className="h-2 w-2" />
-                                Hackathon
-                              </span>
-                            )}
+                            <div className="mt-0.5 flex items-center gap-1 text-[7px] uppercase tracking-[0.1em] opacity-70">
+                              {item.source === 'hackathon' && (
+                                <>
+                                  <Trophy className="h-2 w-2 shrink-0" />
+                                  <span className="truncate">Hackathon</span>
+                                </>
+                              )}
+                              {item.source !== 'hackathon' && (
+                                <span className="truncate">
+                                  {item.color === 'rose' ? 'Highly Imp' : item.color === 'amber' ? 'Priority' : item.color === 'emerald' ? 'Low Priority' : item.color === 'blue' ? 'Casual' : 'Not Set'}
+                                </span>
+                              )}
+                              {item.source === 'hackathon' && item.color !== 'slate' && (
+                                <span className="truncate">
+                                  {item.color === 'rose' ? 'Highly Imp' : item.color === 'amber' ? 'Priority' : item.color === 'emerald' ? 'Low Priority' : 'Casual'}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           {item.source === 'manual' && (
                             <button
@@ -261,9 +273,9 @@ const SolomonOrderCalendar: React.FC = () => {
                       </div>
                     ))}
 
-                    {items.length > 2 && (
+                    {hiddenCount > 0 && (
                       <div className="mt-auto px-1 py-0.5 text-[8px] font-bold text-slate-400">
-                        {items.length - 2}+ more
+                        {hiddenCount}+ more
                       </div>
                     )}
 
