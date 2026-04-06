@@ -215,7 +215,7 @@ const SolomonOrderCalendar: React.FC = () => {
                       setExpandedDate(dayKey);
                     }
                   }}
-                  className={`flex h-[118px] flex-col rounded-xl border p-1.5 ${
+                  className={`grid h-[124px] grid-rows-[auto_minmax(0,1fr)_auto] rounded-xl border p-1.5 ${
                     isCurrentMonth
                       ? 'border-slate-800 bg-slate-950'
                       : 'border-slate-900 bg-slate-950/40 opacity-45'
@@ -232,8 +232,7 @@ const SolomonOrderCalendar: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+                  <div className="flex min-h-0 flex-col gap-1 overflow-hidden">
                     {items.slice(0, 2).map((item) => (
                       <div
                         key={item.id}
@@ -273,19 +272,22 @@ const SolomonOrderCalendar: React.FC = () => {
                         </div>
                       </div>
                     ))}
-                    </div>
+                  </div>
 
-                    {hiddenCount > 0 && (
+                  <div className="mt-1 flex h-5 items-end">
+                    {hiddenCount > 0 ? (
                       <button
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
                           setExpandedDate(dayKey);
                         }}
-                        className="mt-1 h-4 w-fit flex-none rounded-md px-1 py-0.5 text-[8px] font-bold text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                        className="flex h-5 w-full items-center justify-center rounded-md border border-amber-400/30 bg-amber-400/12 px-1 text-[9px] font-black uppercase tracking-[0.08em] text-amber-200 transition-colors hover:bg-amber-400/20 hover:text-amber-100"
                       >
-                        {hiddenCount}+ more
+                        +{hiddenCount} more
                       </button>
+                    ) : (
+                      <div className="h-5 w-full" aria-hidden="true" />
                     )}
                   </div>
                 </div>
