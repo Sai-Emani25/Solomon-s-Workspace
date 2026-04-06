@@ -275,6 +275,12 @@ const SolomonOrderCalendar: React.FC = () => {
                       </div>
                     ))}
 
+                    {items.length > 2 && (
+                      <div className="px-1 py-0.5 text-[8px] font-bold text-slate-400">
+                        {items.length - 2}+ more
+                      </div>
+                    )}
+
                   </div>
                 </div>
               );

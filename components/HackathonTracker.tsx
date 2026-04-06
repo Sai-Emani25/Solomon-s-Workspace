@@ -5,6 +5,7 @@ import { Hackathon, Subtask } from '../types';
 import { normalizeHackathon, parseLocalDate, sortHackathonsByDeadline } from '../utils/calendarUtils';
 
 type FilterType = 'all' | 'in-person' | 'virtual';
+type PriorityFilter = 'all' | NonNullable<Hackathon['priority']>;
 const priorityOptions = [
   { value: 'rose', label: 'Highly Imp', activeClass: 'bg-rose-600 text-white shadow-lg shadow-rose-600/20' },
   { value: 'amber', label: 'Priority', activeClass: 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' },
@@ -32,6 +33,7 @@ const HackathonTracker: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [activePriorityFilter, setActivePriorityFilter] = useState<PriorityFilter>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [linkType, setLinkType] = useState<'submit' | 'in-person'>('submit');
   const [newItem, setNewItem] = useState({ 
@@ -187,8 +189,10 @@ const HackathonTracker: React.FC = () => {
 
   const filteredHackathons = hackathons.filter(h => {
     const matchesType = activeFilter === 'all' || h.type === activeFilter;
+    const priority = h.priority || 'slate';
+    const matchesPriority = activePriorityFilter === 'all' || priority === activePriorityFilter;
     const matchesSearch = h.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesType && matchesSearch;
+    return matchesType && matchesPriority && matchesSearch;
   });
 
   const getDaysRemaining = (deadline: string) => {
@@ -230,6 +234,19 @@ const HackathonTracker: React.FC = () => {
               }`}
             >
               {filter === 'all' ? 'All' : filter.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+            </button>
+          ))}
+          {([{ value: 'all', label: 'Any Color', activeClass: 'bg-slate-200 text-slate-950 shadow-lg shadow-slate-200/10' }, ...priorityOptions] as const).map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setActivePriorityFilter(option.value as PriorityFilter)}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                activePriorityFilter === option.value
+                  ? option.activeClass
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+              }`}
+            >
+              {option.label}
             </button>
           ))}
         </div>
@@ -387,8 +404,8 @@ const HackathonTracker: React.FC = () => {
             <Trophy className="w-12 h-12 mb-4 opacity-20" />
             <p>
               {searchQuery 
-                ? `No hackathons matching "${searchQuery}" ${activeFilter !== 'all' ? `(${activeFilter})` : ''}.` 
-                : `No hackathons ${activeFilter !== 'all' ? `(${activeFilter})` : ''} tracked yet. Ready to build something great?`}
+                ? `No hackathons matching "${searchQuery}" ${activeFilter !== 'all' ? `(${activeFilter})` : ''}${activePriorityFilter !== 'all' ? ` (${activePriorityFilter})` : ''}.` 
+                : `No hackathons ${activeFilter !== 'all' ? `(${activeFilter})` : ''}${activePriorityFilter !== 'all' ? ` (${activePriorityFilter})` : ''} tracked yet. Ready to build something great?`}
             </p>
           </div>
         )}
