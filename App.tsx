@@ -25,6 +25,7 @@ const App: React.FC = () => {
   // Set initial tab to 'hackathons' as requested
   const [activeTab, setActiveTab] = useState<AppTab>('hackathons');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isOrderTab = activeTab === 'order';
 
   const menuItems = [
     { id: 'hackathons' as AppTab, label: 'Hackathon Track', icon: Trophy, color: 'text-amber-400' },
@@ -101,8 +102,8 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 py-8 md:py-12">
-        {/* Header Section */}
+      <main className={`flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 ${isOrderTab ? 'py-4 md:py-4' : 'py-8 md:py-12'}`}>
+        {!isOrderTab && (
         <section className="text-center mb-12 relative">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-indigo-500/10 blur-[100px] -z-10 rounded-full" />
           <h2 className="text-3xl md:text-5xl font-black text-white mb-4 tracking-tight">
@@ -112,9 +113,10 @@ const App: React.FC = () => {
             {menuItems.find(i => i.id === activeTab)?.label} — Personalized productivity environment.
           </p>
         </section>
+        )}
 
         {/* Dynamic Content */}
-        <div className="min-h-[500px] pb-20">
+        <div className={isOrderTab ? 'min-h-0' : 'min-h-[500px] pb-20'}>
           {activeTab === 'hub' && <Hub onNavigate={handleTabChange} />}
           {activeTab === 'hackathons' && <HackathonTracker />}
           {activeTab === 'order' && <SolomonOrderCalendar />}
@@ -131,11 +133,12 @@ const App: React.FC = () => {
           {activeTab === 'app-maker' && <AppMaker />}
         </div>
 
-        {/* Footer Text */}
+        {!isOrderTab && (
         <footer className="text-center text-slate-500 py-12 border-t border-slate-800 mt-12">
           <p className="text-sm">© {new Date().getFullYear()} Solomon's Daily Tools. Privacy focused. Locally processed.</p>
           <p className="text-[10px] mt-2 uppercase tracking-widest opacity-50 font-black">Powered by Excellence</p>
         </footer>
+        )}
       </main>
     </div>
   );

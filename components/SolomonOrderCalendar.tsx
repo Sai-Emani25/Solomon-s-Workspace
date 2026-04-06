@@ -275,19 +275,6 @@ const SolomonOrderCalendar: React.FC = () => {
                       </div>
                     ))}
 
-                    {items.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setExpandedDate(dayKey);
-                        }}
-                        className="w-full rounded-md border border-dashed border-slate-700 px-1 py-0.5 text-[8px] font-bold text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
-                        aria-label={`Show all items for ${dayKey}`}
-                      >
-                        ...
-                      </button>
-                    )}
                   </div>
                 </div>
               );
