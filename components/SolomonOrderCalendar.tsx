@@ -151,20 +151,8 @@ const SolomonOrderCalendar: React.FC = () => {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="rounded-[24px] border border-amber-500/20 bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.08),_transparent_45%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))] p-3 shadow-2xl shadow-amber-950/20">
-        <div className="flex flex-col gap-3 border-b border-slate-800/80 pb-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h2 className="flex items-center gap-2.5 text-lg font-black tracking-tight text-white md:text-2xl">
-              <span className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-1.5 text-amber-300">
-                <CalendarDays className="h-4 w-4" />
-              </span>
-              Solomon&apos;s Order
-            </h2>
-            <p className="mt-1 max-w-2xl text-[11px] text-slate-400 md:text-xs">
-              Manual work blocks stay compact here, and tracked hackathons appear automatically on their deadline dates.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="rounded-[22px] border border-slate-800 bg-slate-950/80 p-2.5">
+          <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
             <div className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
               {CALENDAR_MIN_DATE} to {getCalendarMaxDate()}
             </div>
@@ -179,9 +167,7 @@ const SolomonOrderCalendar: React.FC = () => {
               New Item
             </button>
           </div>
-        </div>
 
-        <div className="mt-3 rounded-[22px] border border-slate-800 bg-slate-950/80 p-2.5">
           <div className="mb-2 flex items-center justify-between gap-3">
             <button
               onClick={() => moveMonth(-1)}
@@ -232,14 +218,14 @@ const SolomonOrderCalendar: React.FC = () => {
                       setExpandedDate(dayKey);
                     }
                   }}
-                  className={`h-[76px] rounded-xl border p-1 ${
+                  className={`flex h-[86px] flex-col rounded-xl border p-1.5 ${
                     isCurrentMonth
                       ? 'border-slate-800 bg-slate-950'
                       : 'border-slate-900 bg-slate-950/40 opacity-45'
                   } ${items.length > 0 ? 'cursor-pointer' : ''}`}
                 >
-                  <div className="mb-0.5 flex items-center justify-between">
-                    <span className={`text-[11px] font-bold ${isToday ? 'text-amber-300' : 'text-slate-300'}`}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className={`text-xs font-bold ${isToday ? 'text-amber-300' : 'text-slate-300'}`}>
                       {day.getDate()}
                     </span>
                     {items.length > 0 && (
@@ -249,12 +235,12 @@ const SolomonOrderCalendar: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="space-y-0.5">
+                  <div className="flex flex-1 flex-col gap-0.5 overflow-hidden">
                     {items.slice(0, 2).map((item) => (
-                      <div key={item.id} className={`group rounded-md px-1 py-0.5 text-[8px] font-bold leading-tight ${colorClasses[item.color]}`}>
+                      <div key={item.id} className={`group flex min-h-[22px] flex-col justify-center rounded-md px-1 py-0.5 text-[8px] font-bold leading-tight ${colorClasses[item.color]}`}>
                         <div className="flex items-start justify-between gap-1">
                           <div className="min-w-0">
-                            <p className="truncate">{item.title}</p>
+                            <p className="truncate whitespace-nowrap">{item.title}</p>
                             {item.source === 'hackathon' && (
                               <span className="mt-0.5 inline-flex items-center gap-1 text-[7px] uppercase tracking-[0.1em] opacity-70">
                                 <Trophy className="h-2 w-2" />
@@ -276,7 +262,7 @@ const SolomonOrderCalendar: React.FC = () => {
                     ))}
 
                     {items.length > 2 && (
-                      <div className="px-1 py-0.5 text-[8px] font-bold text-slate-400">
+                      <div className="mt-auto px-1 py-0.5 text-[8px] font-bold text-slate-400">
                         {items.length - 2}+ more
                       </div>
                     )}
