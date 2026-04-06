@@ -215,7 +215,7 @@ const SolomonOrderCalendar: React.FC = () => {
                       setExpandedDate(dayKey);
                     }
                   }}
-                  className={`flex h-[102px] flex-col rounded-xl border p-1.5 ${
+                  className={`flex h-[118px] flex-col rounded-xl border p-1.5 ${
                     isCurrentMonth
                       ? 'border-slate-800 bg-slate-950'
                       : 'border-slate-900 bg-slate-950/40 opacity-45'
@@ -232,29 +232,30 @@ const SolomonOrderCalendar: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex flex-1 flex-col gap-1 overflow-hidden">
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
                     {items.slice(0, 2).map((item) => (
                       <div
                         key={item.id}
-                        className={`group flex h-[30px] flex-col justify-center rounded-md px-1.5 py-1 text-[8px] font-bold leading-tight ${colorClasses[item.color]}`}
+                        className={`group flex h-[28px] flex-none flex-col justify-center overflow-hidden rounded-md px-1.5 py-1 text-[8px] font-bold leading-tight ${colorClasses[item.color]}`}
                       >
                         <div className="flex items-start justify-between gap-1">
                           <div className="min-w-0">
                             <p className="truncate whitespace-nowrap">{item.title}</p>
-                            <div className="mt-0.5 flex items-center gap-1 text-[7px] uppercase tracking-[0.1em] opacity-70">
+                            <div className="mt-0.5 flex min-w-0 items-center gap-1 overflow-hidden text-[7px] uppercase tracking-[0.1em] opacity-70">
                               {item.source === 'hackathon' && (
                                 <>
                                   <Trophy className="h-2 w-2 shrink-0" />
-                                  <span className="truncate">Hackathon</span>
+                                  <span className="truncate whitespace-nowrap">Hackathon</span>
                                 </>
                               )}
                               {item.source !== 'hackathon' && (
-                                <span className="truncate">
+                                <span className="truncate whitespace-nowrap">
                                   {item.color === 'rose' ? 'Highly Imp' : item.color === 'amber' ? 'Priority' : item.color === 'emerald' ? 'Low Priority' : item.color === 'blue' ? 'Casual' : 'Not Set'}
                                 </span>
                               )}
                               {item.source === 'hackathon' && item.color !== 'slate' && (
-                                <span className="truncate">
+                                <span className="truncate whitespace-nowrap">
                                   {item.color === 'rose' ? 'Highly Imp' : item.color === 'amber' ? 'Priority' : item.color === 'emerald' ? 'Low Priority' : 'Casual'}
                                 </span>
                               )}
@@ -272,13 +273,20 @@ const SolomonOrderCalendar: React.FC = () => {
                         </div>
                       </div>
                     ))}
+                    </div>
 
                     {hiddenCount > 0 && (
-                      <div className="mt-auto px-1 py-0.5 text-[8px] font-bold text-slate-400">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setExpandedDate(dayKey);
+                        }}
+                        className="mt-1 h-4 w-fit flex-none rounded-md px-1 py-0.5 text-[8px] font-bold text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                      >
                         {hiddenCount}+ more
-                      </div>
+                      </button>
                     )}
-
                   </div>
                 </div>
               );
