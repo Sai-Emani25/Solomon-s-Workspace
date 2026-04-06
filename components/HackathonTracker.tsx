@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Calendar, ExternalLink, Plus, Trash2, Clock, AlertCircle, Filter, Edit2, CheckCircle, Circle, Search, X } from 'lucide-react';
 import { Hackathon, Subtask } from '../types';
+import { normalizeHackathon, parseLocalDate, sortHackathonsByDeadline } from '../utils/calendarUtils';
 
 type FilterType = 'all' | 'in-person' | 'virtual';
 
@@ -25,7 +26,7 @@ const HackathonTracker: React.FC = () => {
 
   useEffect(() => {
     const saved = localStorage.getItem('solomon_hackathons');
-    if (saved) setHackathons(JSON.parse(saved));
+    if (saved) setHackathons(sortHackathonsByDeadline(JSON.parse(saved)));
   }, []);
 
   useEffect(() => {
@@ -33,23 +34,16 @@ const HackathonTracker: React.FC = () => {
   }, [hackathons]);
 
   const addHackathon = () => {
-    // Determine deadline used for sorting/display
     let finalDeadline = newItem.deadline;
     let subtasksToSave = newItem.subtasks;
 
     if (newItem.isMultistage && newItem.subtasks.length > 0) {
-        // Sort subtasks by date
-        subtasksToSave = [...newItem.subtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
-        
-        // Find first incomplete task to set as current deadline
-        const activeSubtask = subtasksToSave.find(s => !s.completed);
-        const targetSubtask = activeSubtask || subtasksToSave[subtasksToSave.length - 1]; // Fallback to last if all done
-        
-        const targetDate = new Date(targetSubtask.endDate);
-        const year = targetDate.getFullYear();
-        const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-        const day = String(targetDate.getDate()).padStart(2, '0');
-        finalDeadline = `${year}-${month}-${day}`;
+      const normalizedDraft = normalizeHackathon({
+        id: editingId || 'draft',
+        ...newItem,
+      });
+      finalDeadline = normalizedDraft.deadline;
+      subtasksToSave = normalizedDraft.subtasks || [];
     }
 
     if (!newItem.name || !finalDeadline) return;
@@ -57,19 +51,16 @@ const HackathonTracker: React.FC = () => {
     const itemToSave = { ...newItem, subtasks: subtasksToSave, deadline: finalDeadline };
 
     if (editingId) {
-      // Update existing hackathon
       setHackathons(
-        hackathons.map(h => h.id === editingId ? { ...itemToSave, id: editingId } : h)
-          .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+        sortHackathonsByDeadline(hackathons.map(h => h.id === editingId ? { ...itemToSave, id: editingId } : h))
       );
       setEditingId(null);
     } else {
-      // Add new hackathon
       const hack: Hackathon = {
         id: Date.now().toString(),
         ...itemToSave
       };
-      setHackathons([...hackathons, hack].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()));
+      setHackathons(sortHackathonsByDeadline([...hackathons, hack]));
     }
     setNewItem({ name: '', deadline: '', link: '', platform: '', type: 'virtual', isMultistage: false, subtasks: [] });
     setIsAdding(false);
@@ -102,9 +93,8 @@ const HackathonTracker: React.FC = () => {
       completed: false,
       status: 'todo'
     };
-    // Auto-sort subtasks by date when adding
     const updatedSubtasks = [...newItem.subtasks, subtask].sort((a, b) => 
-      new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
+      parseLocalDate(a.endDate).getTime() - parseLocalDate(b.endDate).getTime()
     );
     setNewItem({ ...newItem, subtasks: updatedSubtasks });
     setNewSubtask({ name: '', endDate: '' });
@@ -116,92 +106,60 @@ const HackathonTracker: React.FC = () => {
 
   const completeStage = (hackathonId: string, subtaskId: string) => {
     setHackathons(prevHackathons => {
-      // Find the hackathon
       const hackathon = prevHackathons.find(h => h.id === hackathonId);
       if (!hackathon || !hackathon.subtasks) return prevHackathons;
 
-      // Remove the completed subtask
-      const newSubtasks = hackathon.subtasks.filter(s => s.id !== subtaskId);
+      const newSubtasks = hackathon.subtasks
+        .filter(s => s.id !== subtaskId)
+        .sort((a, b) => parseLocalDate(a.endDate).getTime() - parseLocalDate(b.endDate).getTime());
 
-      // If no remaining tasks, delete the entire hackathon
       if (newSubtasks.length === 0) {
          return prevHackathons.filter(h => h.id !== hackathonId);
       }
 
-      // Calculate new deadline based on next task
-      const sortedSubtasks = [...newSubtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
-      const nextTask = sortedSubtasks[0];
-      
-      let newDeadline = hackathon.deadline;
-      if (nextTask) {
-           const d = new Date(nextTask.endDate);
-           newDeadline = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      }
-
-      // Return updated hackathons
-      return prevHackathons.map(h => {
-        if (h.id === hackathonId) {
-          return {
-             ...h,
-             subtasks: newSubtasks,
-             deadline: newDeadline
-          };
-        }
-        return h;
-      });
+      return sortHackathonsByDeadline(prevHackathons.map(h => {
+        if (h.id !== hackathonId) return h;
+        return normalizeHackathon({
+          ...h,
+          subtasks: newSubtasks,
+        });
+      }));
     });
   };
 
   const toggleSubtask = (hackathonId: string, subtaskId: string) => {
-    setHackathons(hackathons.map(h => {
+    setHackathons(prevHackathons => sortHackathonsByDeadline(prevHackathons.map(h => {
       if (h.id === hackathonId && h.subtasks) {
-        const newSubtasks = h.subtasks.map(s => 
+        const newSubtasks = h.subtasks.map(s =>
             s.id === subtaskId ? { 
               ...s, 
               completed: !s.completed,
               status: (!s.completed ? 'done' : 'todo') as 'todo' | 'done'
             } : s
           );
-        
-        // Recalculate deadline
-        const sorted = [...newSubtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
-        const active = sorted.find(s => !s.completed) || sorted[sorted.length - 1];
-         
-        const d = new Date(active.endDate);
-        const newDeadline = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
-        return {
+        return normalizeHackathon({
           ...h,
           subtasks: newSubtasks,
-          deadline: newDeadline
-        };
+        });
       }
       return h;
-    }));
+    })));
   };
 
   const updateSubtaskStatus = (hackathonId: string, subtaskId: string, newStatus: 'todo' | 'in-progress' | 'done') => {
-    setHackathons(hackathons.map(h => {
+    setHackathons(prevHackathons => sortHackathonsByDeadline(prevHackathons.map(h => {
       if (h.id === hackathonId && h.subtasks) {
         const newSubtasks = h.subtasks.map(s => 
           s.id === subtaskId ? { ...s, status: newStatus, completed: newStatus === 'done' } : s
         );
 
-        // Recalculate deadline
-        const sorted = [...newSubtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
-        const active = sorted.find(s => !s.completed) || sorted[sorted.length - 1];
-         
-        const d = new Date(active.endDate);
-        const newDeadline = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
-        return {
+        return normalizeHackathon({
           ...h,
           subtasks: newSubtasks,
-          deadline: newDeadline
-        };
+        });
       }
       return h;
-    }));
+    })));
   };
 
   const filteredHackathons = hackathons.filter(h => {
@@ -336,7 +294,7 @@ const HackathonTracker: React.FC = () => {
                 <div className="mb-6 space-y-2">
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Current Submission Stage</p>
                   {h.subtasks && h.subtasks.length > 0 ? (() => {
-                    const sortedSubtasks = [...h.subtasks].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+                    const sortedSubtasks = [...h.subtasks].sort((a, b) => parseLocalDate(a.endDate).getTime() - parseLocalDate(b.endDate).getTime());
                     const activeSubtask = sortedSubtasks.find(s => !s.completed);
                     const totalStages = sortedSubtasks.length;
                     const completedCount = sortedSubtasks.filter(s => s.completed).length;
@@ -456,7 +414,7 @@ const HackathonTracker: React.FC = () => {
               ) : (
                 <div className="p-4 bg-slate-800/30 rounded-xl border border-slate-800">
                   <p className="text-sm text-slate-400">
-                    <span className="text-amber-500 font-bold">Note:</span> For multi-stage hackathons, the overall deadline will be automatically set to the date of the last submission stage.
+                    <span className="text-amber-500 font-bold">Note:</span> For multi-stage hackathons, the overall deadline is automatically tied to the current active submission stage and moves forward as each stage is completed.
                   </p>
                 </div>
               )}

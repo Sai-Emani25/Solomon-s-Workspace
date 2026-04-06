@@ -53,6 +53,15 @@ export interface Hackathon {
   subtasks?: Subtask[];
 }
 
+export interface CalendarItem {
+  id: string;
+  title: string;
+  date: string;
+  color: 'amber' | 'emerald' | 'rose' | 'blue';
+  source?: 'manual' | 'hackathon';
+  link?: string;
+}
+
 export interface StudyItem {
   id: string;
   name: string;
@@ -61,4 +70,4 @@ export interface StudyItem {
   topics: { id: string; name: string; completed: boolean; link?: string }[];
 }
 
-export type AppTab = 'hub' | 'tools' | 'app-maker' | 'hackathons' | 'study';
+export type AppTab = 'hub' | 'tools' | 'app-maker' | 'hackathons' | 'study' | 'order';

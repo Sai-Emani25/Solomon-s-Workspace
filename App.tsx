@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
 import Navbar from './components/Navbar';
-import StreakTracker from './components/StreakTracker';
 import ToolGrid from './components/ToolGrid';
 import Hub from './components/Hub';
 import AppMaker from './components/AppMaker';
 import HackathonTracker from './components/HackathonTracker';
 import StudyTracker from './components/StudyTracker';
+import SolomonOrderCalendar from './components/SolomonOrderCalendar';
 import { 
   Sparkles, 
   Globe, 
@@ -16,7 +16,8 @@ import {
   BookOpen, 
   X,
   ChevronRight,
-  LayoutDashboard
+  LayoutDashboard,
+  CalendarDays
 } from 'lucide-react';
 import { AppTab } from './types';
 
@@ -27,6 +28,7 @@ const App: React.FC = () => {
 
   const menuItems = [
     { id: 'hackathons' as AppTab, label: 'Hackathon Track', icon: Trophy, color: 'text-amber-400' },
+    { id: 'order' as AppTab, label: "Solomon's Order", icon: CalendarDays, color: 'text-yellow-300' },
     { id: 'study' as AppTab, label: 'Study Master', icon: BookOpen, color: 'text-blue-400' },
     { id: 'hub' as AppTab, label: 'Workspace Hub', icon: Globe, color: 'text-indigo-400' },
     { id: 'tools' as AppTab, label: 'Utility Suite', icon: Settings2, color: 'text-purple-400' },
@@ -115,6 +117,7 @@ const App: React.FC = () => {
         <div className="min-h-[500px] pb-20">
           {activeTab === 'hub' && <Hub onNavigate={handleTabChange} />}
           {activeTab === 'hackathons' && <HackathonTracker />}
+          {activeTab === 'order' && <SolomonOrderCalendar />}
           {activeTab === 'study' && <StudyTracker />}
           {activeTab === 'tools' && (
             <div className="animate-in fade-in duration-700">
@@ -126,11 +129,6 @@ const App: React.FC = () => {
             </div>
           )}
           {activeTab === 'app-maker' && <AppMaker />}
-        </div>
-
-        {/* Streak Tracker moved to the bottom */}
-        <div className="mt-12">
-          <StreakTracker />
         </div>
 
         {/* Footer Text */}

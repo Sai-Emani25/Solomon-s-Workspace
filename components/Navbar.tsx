@@ -11,10 +11,11 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
   const handleExport = () => {
     const data = {
-      version: '2.1',
+      version: '2.2',
       exportDate: new Date().toISOString(),
       hubData: localStorage.getItem('solomon_hub_v2'),
       hackathons: localStorage.getItem('solomon_hackathons'),
+      orderCalendar: localStorage.getItem('solomon_order_calendar'),
       studyData: localStorage.getItem('solomon_study'),
       streakData: localStorage.getItem('solomon_streak'),
     };
@@ -44,6 +45,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         if (confirm('This will replace all current data. Continue?')) {
           if (data.hubData) localStorage.setItem('solomon_hub_v2', data.hubData);
           if (data.hackathons) localStorage.setItem('solomon_hackathons', data.hackathons);
+          if (data.orderCalendar) localStorage.setItem('solomon_order_calendar', data.orderCalendar);
           if (data.studyData) localStorage.setItem('solomon_study', data.studyData);
           if (data.streakData) localStorage.setItem('solomon_streak', data.streakData);
 
@@ -117,7 +119,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
         <div className="flex items-center gap-2 px-3 py-1 bg-slate-900 rounded-full border border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
           <Sparkles className="w-3 h-3 text-amber-500" />
-          Daily Suite v2.1
+          Daily Suite v2.2
         </div>
       </div>
     </nav>

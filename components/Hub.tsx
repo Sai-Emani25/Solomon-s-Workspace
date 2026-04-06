@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, 
   FolderPlus, 
@@ -11,13 +11,12 @@ import {
   Globe,
   Search,
   X,
-  Download,
-  Upload as UploadIcon,
   Navigation,
   Trophy,
   BookOpen,
   Settings2,
-  Smartphone
+  Smartphone,
+  CalendarDays
 } from 'lucide-react';
 import { HubFolder, HubLink, AppTab } from '../types';
 
@@ -35,8 +34,6 @@ const Hub: React.FC<HubProps> = ({ onNavigate }) => {
   const [showAddLink, setShowAddLink] = useState<{folderId: string | null} | null>(null);
   const [newLink, setNewLink] = useState({ name: '', url: '' });
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     const saved = localStorage.getItem('solomon_hub_v2');
     if (saved) {
@@ -70,6 +67,7 @@ const Hub: React.FC<HubProps> = ({ onNavigate }) => {
   // Tab navigation shortcuts
   const navigationShortcuts = useMemo(() => [
     { id: 'hackathons' as AppTab, label: 'Hackathons', icon: Trophy, color: 'text-amber-400' },
+    { id: 'order' as AppTab, label: "Solomon's Order", icon: CalendarDays, color: 'text-yellow-300' },
     { id: 'study' as AppTab, label: 'Study Master', icon: BookOpen, color: 'text-blue-400' },
     { id: 'tools' as AppTab, label: 'File Tools', icon: Settings2, color: 'text-purple-400' },
     { id: 'app-maker' as AppTab, label: 'APK Generator', icon: Smartphone, color: 'text-emerald-400' },
@@ -156,47 +154,6 @@ const Hub: React.FC<HubProps> = ({ onNavigate }) => {
     setOpenFolders(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const exportData = () => {
-    const dataStr = JSON.stringify(folders, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    const exportFileDefaultName = `solomon_hub_backup_${new Date().toISOString().split('T')[0]}.json`;
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const importedFolders = JSON.parse(content);
-        if (Array.isArray(importedFolders)) {
-          if (confirm('This will overwrite your current workspace links. Continue?')) {
-            setFolders(importedFolders);
-            const newOpen: Record<string, boolean> = {};
-            importedFolders.forEach(f => newOpen[f.id] = true);
-            setOpenFolders(newOpen);
-          }
-        } else {
-          alert('Invalid file format.');
-        }
-      } catch (err) {
-        alert('Error reading the file.');
-      }
-    };
-    reader.readAsText(file);
-    if (event.target) event.target.value = '';
-  };
-
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       {/* Dynamic Search / Command Bar */}
@@ -228,13 +185,6 @@ const Hub: React.FC<HubProps> = ({ onNavigate }) => {
         </h2>
         
         <div className="flex flex-wrap items-center gap-2">
-          <input type="file" ref={fileInputRef} onChange={importData} accept=".json" className="hidden" />
-          <button onClick={handleImportClick} className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition-all border border-slate-700">
-            <UploadIcon className="w-3.5 h-3.5" /> Import
-          </button>
-          <button onClick={exportData} className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition-all border border-slate-700">
-            <Download className="w-3.5 h-3.5" /> Export
-          </button>
           <button onClick={() => setShowAddFolder(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-indigo-600/20">
             <FolderPlus className="w-4 h-4" /> Add Folder
           </button>
