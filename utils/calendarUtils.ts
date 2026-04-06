@@ -51,8 +51,13 @@ export const getHackathonActiveSubtask = (hackathon: Hackathon): Subtask | undef
 };
 
 export const normalizeHackathon = (hackathon: Hackathon): Hackathon => {
+  const priority = hackathon.priority || 'slate';
+
   if (!hackathon.isMultistage || !hackathon.subtasks?.length) {
-    return hackathon;
+    return {
+      ...hackathon,
+      priority,
+    };
   }
 
   const sortedSubtasks = sortSubtasks(hackathon.subtasks);
@@ -60,6 +65,7 @@ export const normalizeHackathon = (hackathon: Hackathon): Hackathon => {
 
   return {
     ...hackathon,
+    priority,
     subtasks: sortedSubtasks,
     deadline: activeSubtask?.endDate || hackathon.deadline,
   };

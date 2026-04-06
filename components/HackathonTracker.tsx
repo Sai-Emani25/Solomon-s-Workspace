@@ -5,6 +5,27 @@ import { Hackathon, Subtask } from '../types';
 import { normalizeHackathon, parseLocalDate, sortHackathonsByDeadline } from '../utils/calendarUtils';
 
 type FilterType = 'all' | 'in-person' | 'virtual';
+const priorityOptions = [
+  { value: 'rose', label: 'Highly Imp', activeClass: 'bg-rose-600 text-white shadow-lg shadow-rose-600/20' },
+  { value: 'amber', label: 'Priority', activeClass: 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' },
+  { value: 'emerald', label: 'Low Priority', activeClass: 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' },
+  { value: 'blue', label: 'Casual', activeClass: 'bg-sky-600 text-white shadow-lg shadow-sky-600/20' },
+  { value: 'slate', label: 'Not Set', activeClass: 'bg-slate-600 text-white shadow-lg shadow-slate-700/20' },
+] as const;
+const priorityBadgeClasses: Record<NonNullable<Hackathon['priority']>, string> = {
+  rose: 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
+  amber: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
+  emerald: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+  blue: 'bg-sky-500/15 text-sky-300 border border-sky-500/30',
+  slate: 'bg-slate-700/40 text-slate-300 border border-slate-600/50',
+};
+const priorityCardClasses: Record<NonNullable<Hackathon['priority']>, string> = {
+  rose: 'border-rose-500/40',
+  amber: 'border-amber-500/40',
+  emerald: 'border-emerald-500/35',
+  blue: 'border-sky-500/35',
+  slate: 'border-slate-800',
+};
 
 const HackathonTracker: React.FC = () => {
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
@@ -20,7 +41,8 @@ const HackathonTracker: React.FC = () => {
     platform: '', 
     type: 'virtual' as 'in-person' | 'virtual',
     isMultistage: false,
-    subtasks: [] as Subtask[]
+    subtasks: [] as Subtask[],
+    priority: 'slate' as Hackathon['priority'],
   });
   const [newSubtask, setNewSubtask] = useState({ name: '', endDate: '' });
 
@@ -62,7 +84,7 @@ const HackathonTracker: React.FC = () => {
       };
       setHackathons(sortHackathonsByDeadline([...hackathons, hack]));
     }
-    setNewItem({ name: '', deadline: '', link: '', platform: '', type: 'virtual', isMultistage: false, subtasks: [] });
+    setNewItem({ name: '', deadline: '', link: '', platform: '', type: 'virtual', isMultistage: false, subtasks: [], priority: 'slate' });
     setIsAdding(false);
   };
 
@@ -74,7 +96,8 @@ const HackathonTracker: React.FC = () => {
       platform: hackathon.platform,
       type: hackathon.type,
       isMultistage: hackathon.isMultistage,
-      subtasks: hackathon.subtasks || []
+      subtasks: hackathon.subtasks || [],
+      priority: hackathon.priority || 'slate',
     });
     setLinkType(hackathon.link ? 'submit' : 'in-person');
     setEditingId(hackathon.id);
@@ -238,9 +261,10 @@ const HackathonTracker: React.FC = () => {
           const days = getDaysRemaining(h.deadline);
           const isUrgent = days >= 0 && days <= 3;
           const isOver = days < 0;
+          const priority = h.priority || 'slate';
 
           return (
-            <div key={h.id} className={`bg-slate-900 border ${isUrgent ? 'border-amber-500/50' : 'border-slate-800'} rounded-2xl p-6 relative group overflow-hidden`}>
+            <div key={h.id} className={`bg-slate-900 border ${isUrgent ? 'border-amber-500/50' : priorityCardClasses[priority]} rounded-2xl p-6 relative group overflow-hidden`}>
               {isUrgent && <div className="absolute top-0 right-0 p-1 bg-amber-500 text-black text-[10px] font-black uppercase px-2 rounded-bl-lg">Urgent</div>}
               
               <div className="flex justify-between items-start mb-4">
@@ -276,6 +300,9 @@ const HackathonTracker: React.FC = () => {
                     Multi-Stage
                   </span>
                 )}
+                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${priorityBadgeClasses[priority]}`}>
+                  {priorityOptions.find((option) => option.value === priority)?.label || 'Not Set'}
+                </span>
               </div>
 
               <div className="space-y-3 mb-6">
@@ -427,6 +454,26 @@ const HackathonTracker: React.FC = () => {
                   placeholder="e.g., Devpost, Unstop"
                 />
               </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Color / Priority Optional</label>
+                <p className="mb-3 text-xs text-slate-500">If you leave this unset, the hackathon shows in gray by default.</p>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {priorityOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setNewItem({ ...newItem, priority: option.value })}
+                      className={`px-3 py-3 rounded-xl text-xs font-bold transition-all ${
+                        newItem.priority === option.value
+                          ? option.activeClass
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Application Method</label>
@@ -559,7 +606,7 @@ const HackathonTracker: React.FC = () => {
                   setIsAdding(false);
                   setEditingId(null);
                   setLinkType('submit');
-                  setNewItem({ name: '', deadline: '', link: '', platform: '', type: 'virtual', isMultistage: false, subtasks: [] });
+                  setNewItem({ name: '', deadline: '', link: '', platform: '', type: 'virtual', isMultistage: false, subtasks: [], priority: 'slate' });
                 }}
                 className="flex-1 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold hover:bg-slate-700 transition-colors"
               >

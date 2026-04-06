@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, Trophy } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, Plus, Trash2, Trophy, X } from 'lucide-react';
 import { CalendarItem, Hackathon } from '../types';
 import {
   CALENDAR_MIN_DATE,
@@ -15,18 +15,19 @@ import {
 } from '../utils/calendarUtils';
 
 const colorClasses: Record<NonNullable<CalendarItem['color']>, string> = {
+  slate: 'bg-slate-300 text-slate-950 border border-slate-400/70',
   amber: 'bg-amber-200 text-amber-950 border border-amber-300/80',
   emerald: 'bg-emerald-300 text-emerald-950 border border-emerald-400/70',
   rose: 'bg-rose-400 text-rose-950 border border-rose-300/70',
   blue: 'bg-sky-300 text-sky-950 border border-sky-400/70',
 };
 
-const palette = ['amber', 'rose', 'emerald', 'blue'] as const;
-
-const getHackathonColor = (hackathon: Hackathon): CalendarItem['color'] => {
-  const index = hackathon.name.length % palette.length;
-  return palette[index];
-};
+const priorityOptions = [
+  { value: 'rose', label: 'Highly Imp' },
+  { value: 'amber', label: 'Priority' },
+  { value: 'emerald', label: 'Low Priority' },
+  { value: 'blue', label: 'Casual' },
+] as const;
 
 const getMonthDays = (month: Date): Date[] => {
   const year = month.getFullYear();
@@ -47,10 +48,11 @@ const SolomonOrderCalendar: React.FC = () => {
   const [manualItems, setManualItems] = useState<CalendarItem[]>([]);
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ title: string; date: string; color: CalendarItem['color'] }>({
     title: '',
     date: formatDateInput(clampMonthToCalendarRange(new Date())),
-    color: 'amber',
+    color: 'rose',
   });
 
   useEffect(() => {
@@ -90,7 +92,7 @@ const SolomonOrderCalendar: React.FC = () => {
         id: `hackathon-${hackathon.id}`,
         title: hackathon.name,
         date: hackathon.deadline,
-        color: getHackathonColor(hackathon),
+        color: hackathon.priority || 'slate',
         source: 'hackathon',
         link: hackathon.link,
       }));
@@ -144,26 +146,26 @@ const SolomonOrderCalendar: React.FC = () => {
 
   const canGoPrevious = viewMonth.getTime() > minMonth.getTime();
   const canGoNext = viewMonth.getTime() < maxMonth.getTime();
+  const expandedItems = expandedDate ? (itemsByDate[expandedDate] || []) : [];
 
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="rounded-[24px] border border-amber-500/20 bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.08),_transparent_45%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))] p-3 md:p-4 shadow-2xl shadow-amber-950/20">
-        <div className="flex flex-col gap-3 border-b border-slate-800/80 pb-4 md:flex-row md:items-start md:justify-between">
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="rounded-[24px] border border-amber-500/20 bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.08),_transparent_45%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))] p-3 shadow-2xl shadow-amber-950/20">
+        <div className="flex flex-col gap-3 border-b border-slate-800/80 pb-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.35em] text-amber-400/80">Castle Task Registry</p>
-            <h2 className="mt-1.5 flex items-center gap-2.5 text-xl font-black tracking-tight text-white md:text-3xl">
+            <h2 className="flex items-center gap-2.5 text-lg font-black tracking-tight text-white md:text-2xl">
               <span className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-1.5 text-amber-300">
-                <CalendarDays className="h-5 w-5" />
+                <CalendarDays className="h-4 w-4" />
               </span>
               Solomon&apos;s Order
             </h2>
-            <p className="mt-1 max-w-2xl text-xs text-slate-400 md:text-sm">
+            <p className="mt-1 max-w-2xl text-[11px] text-slate-400 md:text-xs">
               Manual work blocks stay compact here, and tracked hackathons appear automatically on their deadline dates.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+            <div className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
               {CALENDAR_MIN_DATE} to {getCalendarMaxDate()}
             </div>
             <button
@@ -171,7 +173,7 @@ const SolomonOrderCalendar: React.FC = () => {
                 setDraft((previous) => ({ ...previous, date: formatDateInput(viewMonth) }));
                 setIsAdding(true);
               }}
-              className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-3.5 py-1.5 text-xs font-black text-slate-950 transition-colors hover:bg-amber-300"
+              className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-3 py-1.5 text-[11px] font-black text-slate-950 transition-colors hover:bg-amber-300"
             >
               <Plus className="h-3.5 w-3.5" />
               New Item
@@ -179,8 +181,8 @@ const SolomonOrderCalendar: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-4 rounded-[22px] border border-slate-800 bg-slate-950/80 p-2.5 md:p-3.5">
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mt-3 rounded-[22px] border border-slate-800 bg-slate-950/80 p-2.5">
+          <div className="mb-2 flex items-center justify-between gap-3">
             <button
               onClick={() => moveMonth(-1)}
               disabled={!canGoPrevious}
@@ -191,10 +193,10 @@ const SolomonOrderCalendar: React.FC = () => {
             </button>
 
             <div className="text-center">
-              <h3 className="text-lg font-black uppercase tracking-[0.18em] text-white md:text-xl">
+              <h3 className="text-base font-black uppercase tracking-[0.14em] text-white md:text-lg">
                 {viewMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
               </h3>
-              <p className="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-500">
+              <p className="mt-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-500">
                 {manualItems.length} manual items • {hackathons.length} hackathons tracked
               </p>
             </div>
@@ -209,13 +211,13 @@ const SolomonOrderCalendar: React.FC = () => {
             </button>
           </div>
 
-          <div className="mb-1.5 grid grid-cols-7 gap-1.5 px-1 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+          <div className="mb-1 grid grid-cols-7 gap-1 px-1 text-center text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
               <div key={day} className="py-1">{day}</div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5">
+          <div className="grid grid-cols-7 gap-1">
             {visibleDays.map((day) => {
               const dayKey = formatDateInput(day);
               const isCurrentMonth = day.getMonth() === viewMonth.getMonth();
@@ -225,32 +227,32 @@ const SolomonOrderCalendar: React.FC = () => {
               return (
                 <div
                   key={dayKey}
-                  className={`min-h-[82px] rounded-xl border p-1.5 md:min-h-[96px] ${
+                  className={`h-[76px] rounded-xl border p-1 ${
                     isCurrentMonth
                       ? 'border-slate-800 bg-slate-950'
                       : 'border-slate-900 bg-slate-950/40 opacity-45'
                   }`}
                 >
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className={`text-xs font-bold ${isToday ? 'text-amber-300' : 'text-slate-300'}`}>
+                  <div className="mb-0.5 flex items-center justify-between">
+                    <span className={`text-[11px] font-bold ${isToday ? 'text-amber-300' : 'text-slate-300'}`}>
                       {day.getDate()}
                     </span>
                     {items.length > 0 && (
-                      <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] font-black text-slate-400">
+                      <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[8px] font-black text-slate-400">
                         {items.length}
                       </span>
                     )}
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {items.slice(0, 2).map((item) => (
-                      <div key={item.id} className={`group rounded-md px-1.5 py-1 text-[10px] font-bold leading-tight ${colorClasses[item.color]}`}>
+                      <div key={item.id} className={`group rounded-md px-1 py-0.5 text-[8px] font-bold leading-tight ${colorClasses[item.color]}`}>
                         <div className="flex items-start justify-between gap-1">
                           <div className="min-w-0">
                             <p className="truncate">{item.title}</p>
                             {item.source === 'hackathon' && (
-                              <span className="mt-0.5 inline-flex items-center gap-1 text-[8px] uppercase tracking-[0.12em] opacity-70">
-                                <Trophy className="h-2.5 w-2.5" />
+                              <span className="mt-0.5 inline-flex items-center gap-1 text-[7px] uppercase tracking-[0.1em] opacity-70">
+                                <Trophy className="h-2 w-2" />
                                 Hackathon
                               </span>
                             )}
@@ -261,7 +263,7 @@ const SolomonOrderCalendar: React.FC = () => {
                               className="opacity-0 transition-opacity group-hover:opacity-100"
                               aria-label={`Remove ${item.title}`}
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-2.5 w-2.5" />
                             </button>
                           )}
                         </div>
@@ -269,9 +271,13 @@ const SolomonOrderCalendar: React.FC = () => {
                     ))}
 
                     {items.length > 2 && (
-                      <div className="rounded-md border border-dashed border-slate-800 px-1.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-slate-500">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedDate(dayKey)}
+                        className="w-full rounded-md border border-dashed border-slate-700 px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                      >
                         +{items.length - 2} more
-                      </div>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -314,16 +320,16 @@ const SolomonOrderCalendar: React.FC = () => {
               <div>
                 <label className="mb-2 block text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Color</label>
                 <div className="grid grid-cols-4 gap-2">
-                  {palette.map((color) => (
+                  {priorityOptions.map((color) => (
                     <button
-                      key={color}
+                      key={color.value}
                       type="button"
-                      onClick={() => setDraft((previous) => ({ ...previous, color }))}
-                      className={`rounded-2xl px-3 py-2 text-xs font-black uppercase tracking-[0.16em] transition ${colorClasses[color]} ${
-                        draft.color === color ? 'ring-2 ring-white/80' : 'opacity-80 hover:opacity-100'
+                      onClick={() => setDraft((previous) => ({ ...previous, color: color.value }))}
+                      className={`rounded-2xl px-3 py-2 text-xs font-black uppercase tracking-[0.16em] transition ${colorClasses[color.value]} ${
+                        draft.color === color.value ? 'ring-2 ring-white/80' : 'opacity-80 hover:opacity-100'
                       }`}
                     >
-                      {color}
+                      {color.label}
                     </button>
                   ))}
                 </div>
@@ -344,6 +350,73 @@ const SolomonOrderCalendar: React.FC = () => {
               >
                 Save Item
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {expandedDate && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-[28px] border border-slate-800 bg-slate-950 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">All Items</p>
+                <h3 className="mt-1 text-xl font-black text-white">
+                  {parseLocalDate(expandedDate).toLocaleDateString('en-IN', { dateStyle: 'full' })}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedDate(null)}
+                className="rounded-full border border-slate-700 p-2 text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                aria-label="Close full day list"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto px-6 py-5 styled-scrollbar">
+              {expandedItems.map((item) => (
+                <div key={item.id} className={`rounded-2xl p-4 ${colorClasses[item.color]}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black">{item.title}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] opacity-75">
+                        <span>{item.source === 'hackathon' ? 'Hackathon' : 'Manual Item'}</span>
+                        {item.color === 'rose' && <span>Highly Imp</span>}
+                        {item.color === 'amber' && <span>Priority</span>}
+                        {item.color === 'emerald' && <span>Low Priority</span>}
+                        {item.color === 'blue' && <span>Casual</span>}
+                        {item.color === 'slate' && <span>Not Set</span>}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {item.link && (
+                        <a
+                          href={item.link.startsWith('http') ? item.link : `https://${item.link}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full border border-black/10 bg-white/30 p-2 transition-colors hover:bg-white/45"
+                          aria-label={`Open ${item.title}`}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                      {item.source === 'manual' && (
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="rounded-full border border-black/10 bg-white/30 p-2 transition-colors hover:bg-white/45"
+                          aria-label={`Remove ${item.title}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

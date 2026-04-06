@@ -51,13 +51,14 @@ export interface Hackathon {
   type: 'in-person' | 'virtual';
   isMultistage: boolean;
   subtasks?: Subtask[];
+  priority?: CalendarItem['color'];
 }
 
 export interface CalendarItem {
   id: string;
   title: string;
   date: string;
-  color: 'amber' | 'emerald' | 'rose' | 'blue';
+  color: 'amber' | 'emerald' | 'rose' | 'blue' | 'slate';
   source?: 'manual' | 'hackathon';
   link?: string;
 }
