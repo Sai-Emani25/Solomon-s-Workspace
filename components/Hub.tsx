@@ -15,7 +15,6 @@ import {
   Trophy,
   BookOpen,
   Settings2,
-  Smartphone,
   CalendarDays
 } from 'lucide-react';
 import { HubFolder, HubLink, AppTab } from '../types';
@@ -70,7 +69,6 @@ const Hub: React.FC<HubProps> = ({ onNavigate }) => {
     { id: 'order' as AppTab, label: "Solomon's Order", icon: CalendarDays, color: 'text-yellow-300' },
     { id: 'study' as AppTab, label: 'Study Master', icon: BookOpen, color: 'text-blue-400' },
     { id: 'tools' as AppTab, label: 'File Tools', icon: Settings2, color: 'text-purple-400' },
-    { id: 'app-maker' as AppTab, label: 'APK Generator', icon: Smartphone, color: 'text-emerald-400' },
     { id: 'hub' as AppTab, label: 'Home / Hub', icon: Globe, color: 'text-indigo-400' },
   ], []);
 

@@ -1,6 +1,53 @@
 
 import React, { useRef } from 'react';
 import { Crown, Sparkles, Menu, Download, Upload } from 'lucide-react';
+import { CalendarItem, Hackathon } from '../types';
+import { sanitizeCalendarItems, sortHackathonsByDeadline } from '../utils/calendarUtils';
+
+const BACKUP_VERSION = '3.0';
+const storageFields = [
+  ['hubData', 'solomon_hub_v2'],
+  ['hackathons', 'solomon_hackathons'],
+  ['orderCalendar', 'solomon_order_calendar'],
+  ['studyData', 'solomon_study'],
+  ['streakData', 'solomon_streak'],
+] as const;
+
+type BackupPayload = Record<string, unknown> & { data?: Record<string, unknown> };
+
+const toStorageValue = (storageKey: string, value: unknown): string | null => {
+  if (typeof value === 'string') {
+    value = JSON.parse(value);
+  }
+  if (value === undefined || value === null) return null;
+
+  if (storageKey === 'solomon_hackathons') {
+    if (!Array.isArray(value)) throw new Error('The hackathons section is not a list.');
+    return JSON.stringify(sortHackathonsByDeadline(value as Hackathon[]));
+  }
+  if (storageKey === 'solomon_order_calendar') {
+    if (!Array.isArray(value)) throw new Error('The calendar tasks section is not a list.');
+    return JSON.stringify(sanitizeCalendarItems(value as CalendarItem[]));
+  }
+  return JSON.stringify(value);
+};
+
+const readBackup = (payload: BackupPayload) => {
+  const source = payload.data && typeof payload.data === 'object' ? payload.data : payload;
+  const restored: { key: string; value: string }[] = [];
+
+  storageFields.forEach(([backupKey, storageKey]) => {
+    const value = source[backupKey];
+    if (value === undefined || value === null) return;
+    const serialized = toStorageValue(storageKey, value);
+    if (serialized !== null) restored.push({ key: storageKey, value: serialized });
+  });
+
+  if (restored.length === 0) {
+    throw new Error('This file does not contain any Solomon Workspace data.');
+  }
+  return restored;
+};
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -11,13 +58,10 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
   const handleExport = () => {
     const data = {
-      version: '2.2',
+      format: 'solomon-workspace-backup',
+      version: BACKUP_VERSION,
       exportDate: new Date().toISOString(),
-      hubData: localStorage.getItem('solomon_hub_v2'),
-      hackathons: localStorage.getItem('solomon_hackathons'),
-      orderCalendar: localStorage.getItem('solomon_order_calendar'),
-      studyData: localStorage.getItem('solomon_study'),
-      streakData: localStorage.getItem('solomon_streak'),
+      data: Object.fromEntries(storageFields.map(([backupKey, storageKey]) => [backupKey, localStorage.getItem(storageKey)])),
     };
 
     const json = JSON.stringify(data, null, 2);
@@ -40,20 +84,22 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
     reader.onload = (e) => {
       try {
         const json = e.target?.result as string;
-        const data = JSON.parse(json);
+        const data = JSON.parse(json) as BackupPayload;
+        const restored = readBackup(data);
+        const hackathonData = restored.find((section) => section.key === 'solomon_hackathons');
+        const calendarData = restored.find((section) => section.key === 'solomon_order_calendar');
+        const hackathonCount = hackathonData ? JSON.parse(hackathonData.value).length : 0;
+        const taskCount = calendarData ? JSON.parse(calendarData.value).length : 0;
 
-        if (confirm('This will replace all current data. Continue?')) {
-          if (data.hubData) localStorage.setItem('solomon_hub_v2', data.hubData);
-          if (data.hackathons) localStorage.setItem('solomon_hackathons', data.hackathons);
-          if (data.orderCalendar) localStorage.setItem('solomon_order_calendar', data.orderCalendar);
-          if (data.studyData) localStorage.setItem('solomon_study', data.studyData);
-          if (data.streakData) localStorage.setItem('solomon_streak', data.streakData);
+        if (confirm(`Restore ${restored.length} workspace sections from this backup? This replaces the current saved data.`)) {
+          restored.forEach(({ key, value }) => localStorage.setItem(key, value));
 
-          alert('Data imported successfully! Refreshing page...');
+          alert(`Data imported successfully: ${hackathonCount} hackathons and ${taskCount} scheduled task${taskCount === 1 ? '' : 's'} restored. Refreshing page...`);
           window.location.reload();
         }
       } catch (error) {
-        alert('Failed to import data. Please check the file format.');
+        const message = error instanceof Error ? error.message : 'Please check the file format.';
+        alert(`Failed to import data: ${message}`);
         console.error('Import error:', error);
       }
     };

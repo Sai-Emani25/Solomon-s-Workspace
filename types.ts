@@ -33,15 +33,6 @@ export interface HubFolder {
   links: HubLink[];
 }
 
-export interface Subtask {
-  id: string;
-  name: string;
-  startDate?: string;
-  endDate: string;
-  completed: boolean;
-  status: 'todo' | 'in-progress' | 'done';
-}
-
 export interface Hackathon {
   id: string;
   name: string;
@@ -49,8 +40,6 @@ export interface Hackathon {
   link: string;
   platform: string;
   type: 'in-person' | 'virtual';
-  isMultistage: boolean;
-  subtasks?: Subtask[];
   priority?: CalendarItem['color'];
 }
 
@@ -61,6 +50,7 @@ export interface CalendarItem {
   color: 'amber' | 'emerald' | 'rose' | 'blue' | 'slate';
   source?: 'manual' | 'hackathon';
   link?: string;
+  completed?: boolean;
 }
 
 export interface StudyItem {
@@ -71,4 +61,4 @@ export interface StudyItem {
   topics: { id: string; name: string; completed: boolean; link?: string }[];
 }
 
-export type AppTab = 'hub' | 'tools' | 'app-maker' | 'hackathons' | 'study' | 'order';
+export type AppTab = 'hub' | 'tools' | 'hackathons' | 'study' | 'order' | 'daily';

@@ -3,21 +3,21 @@ import React, { useState } from 'react';
 import Navbar from './components/Navbar';
 import ToolGrid from './components/ToolGrid';
 import Hub from './components/Hub';
-import AppMaker from './components/AppMaker';
 import HackathonTracker from './components/HackathonTracker';
 import StudyTracker from './components/StudyTracker';
 import SolomonOrderCalendar from './components/SolomonOrderCalendar';
+import DailyTodo from './components/DailyTodo';
 import { 
   Sparkles, 
   Globe, 
   Settings2, 
-  Smartphone, 
   Trophy, 
   BookOpen, 
   X,
   ChevronRight,
   LayoutDashboard,
   CalendarDays
+  ,ListTodo
 } from 'lucide-react';
 import { AppTab } from './types';
 
@@ -30,10 +30,10 @@ const App: React.FC = () => {
   const menuItems = [
     { id: 'hackathons' as AppTab, label: 'Hackathon Track', icon: Trophy, color: 'text-amber-400' },
     { id: 'order' as AppTab, label: "Solomon's Order", icon: CalendarDays, color: 'text-yellow-300' },
+    { id: 'daily' as AppTab, label: 'Daily To-Do', icon: ListTodo, color: 'text-indigo-300' },
     { id: 'study' as AppTab, label: 'Study Master', icon: BookOpen, color: 'text-blue-400' },
     { id: 'hub' as AppTab, label: 'Workspace Hub', icon: Globe, color: 'text-indigo-400' },
     { id: 'tools' as AppTab, label: 'Utility Suite', icon: Settings2, color: 'text-purple-400' },
-    { id: 'app-maker' as AppTab, label: 'APK Generator', icon: Smartphone, color: 'text-emerald-400' },
   ];
 
   const handleTabChange = (tab: AppTab) => {
@@ -120,6 +120,7 @@ const App: React.FC = () => {
           {activeTab === 'hub' && <Hub onNavigate={handleTabChange} />}
           {activeTab === 'hackathons' && <HackathonTracker />}
           {activeTab === 'order' && <SolomonOrderCalendar />}
+          {activeTab === 'daily' && <DailyTodo />}
           {activeTab === 'study' && <StudyTracker />}
           {activeTab === 'tools' && (
             <div className="animate-in fade-in duration-700">
@@ -130,7 +131,6 @@ const App: React.FC = () => {
               <ToolGrid />
             </div>
           )}
-          {activeTab === 'app-maker' && <AppMaker />}
         </div>
 
         {!isOrderTab && (

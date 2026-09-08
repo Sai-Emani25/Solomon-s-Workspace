@@ -1,646 +1,84 @@
+import React, { useEffect, useState } from 'react';
+import { Calendar, CheckCircle, ChevronDown, Clock, Edit2, ExternalLink, Filter, Plus, Search, Trash2, Trophy, X } from 'lucide-react';
+import { CalendarItem, Hackathon } from '../types';
+import { CALENDAR_STORAGE_KEY, formatDateInput, getCalendarMaxDate, isCalendarDateAllowed, sanitizeCalendarItems, sortCalendarItems, sortHackathonsByDeadline } from '../utils/calendarUtils';
 
-import React, { useState, useEffect } from 'react';
-import { Trophy, Calendar, ExternalLink, Plus, Trash2, Clock, AlertCircle, Filter, Edit2, CheckCircle, Circle, Search, X } from 'lucide-react';
-import { Hackathon, Subtask } from '../types';
-import { normalizeHackathon, parseLocalDate, sortHackathonsByDeadline } from '../utils/calendarUtils';
+type Priority = NonNullable<Hackathon['priority']>;
+type ContentFilter = 'all' | 'hackathons' | 'tasks';
+type TypeFilter = 'all' | 'in-person' | 'virtual';
 
-type FilterType = 'all' | 'in-person' | 'virtual';
-type PriorityFilter = 'all' | NonNullable<Hackathon['priority']>;
-const priorityOptions = [
-  { value: 'rose', label: 'Highly Imp', activeClass: 'bg-rose-600 text-white shadow-lg shadow-rose-600/20' },
-  { value: 'amber', label: 'Priority', activeClass: 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' },
-  { value: 'emerald', label: 'Low Priority', activeClass: 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' },
-  { value: 'blue', label: 'Casual', activeClass: 'bg-sky-600 text-white shadow-lg shadow-sky-600/20' },
-  { value: 'slate', label: 'Not Set', activeClass: 'bg-slate-600 text-white shadow-lg shadow-slate-700/20' },
-] as const;
-const priorityBadgeClasses: Record<NonNullable<Hackathon['priority']>, string> = {
-  rose: 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
-  amber: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
-  emerald: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
-  blue: 'bg-sky-500/15 text-sky-300 border border-sky-500/30',
-  slate: 'bg-slate-700/40 text-slate-300 border border-slate-600/50',
-};
-const priorityCardClasses: Record<NonNullable<Hackathon['priority']>, string> = {
-  rose: 'border-rose-500/40',
-  amber: 'border-amber-500/40',
-  emerald: 'border-emerald-500/35',
-  blue: 'border-sky-500/35',
-  slate: 'border-slate-800',
-};
+const priorities: { value: Priority; label: string; picker: string; card: string; muted: string; panel: string }[] = [
+  { value: 'rose', label: 'Highly Imp', picker: 'bg-rose-600 text-white', card: 'border-rose-400 bg-rose-600 text-white', muted: 'text-white/75', panel: 'bg-white/15 border-white/20' },
+  { value: 'amber', label: 'Priority', picker: 'bg-amber-300 text-slate-950', card: 'border-amber-200 bg-amber-300 text-slate-950', muted: 'text-slate-950/70', panel: 'bg-black/10 border-black/10' },
+  { value: 'emerald', label: 'Low Priority', picker: 'bg-emerald-400 text-slate-950', card: 'border-emerald-300 bg-emerald-400 text-slate-950', muted: 'text-slate-950/70', panel: 'bg-black/10 border-black/10' },
+  { value: 'blue', label: 'Casual', picker: 'bg-sky-300 text-slate-950', card: 'border-sky-200 bg-sky-300 text-slate-950', muted: 'text-slate-950/70', panel: 'bg-black/10 border-black/10' },
+  { value: 'slate', label: 'Not Set', picker: 'bg-slate-600 text-white', card: 'border-slate-800 bg-slate-900 text-white', muted: 'text-slate-400', panel: 'bg-slate-800 border-slate-700' },
+];
+const priorityFor = (value?: Priority) => priorities.find((priority) => priority.value === (value || 'slate')) || priorities[4];
+const emptyHackathon: Omit<Hackathon, 'id'> = { name: '', deadline: '', link: '', platform: '', type: 'virtual', priority: 'slate' };
 
 const HackathonTracker: React.FC = () => {
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
+  const [tasks, setTasks] = useState<CalendarItem[]>([]);
+  const [hasLoadedHackathons, setHasLoadedHackathons] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isAddingTask, setIsAddingTask] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [activePriorityFilter, setActivePriorityFilter] = useState<PriorityFilter>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [contentFilter, setContentFilter] = useState<ContentFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | Priority>('all');
+  const [colourOpen, setColourOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [linkType, setLinkType] = useState<'submit' | 'in-person'>('submit');
-  const [newItem, setNewItem] = useState({ 
-    name: '', 
-    deadline: '', 
-    link: '', 
-    platform: '', 
-    type: 'virtual' as 'in-person' | 'virtual',
-    isMultistage: false,
-    subtasks: [] as Subtask[],
-    priority: 'slate' as Hackathon['priority'],
-  });
-  const [newSubtask, setNewSubtask] = useState({ name: '', endDate: '' });
+  const [newItem, setNewItem] = useState(emptyHackathon);
+  const [task, setTask] = useState<{ title: string; date: string; color: CalendarItem['color'] }>({ title: '', date: formatDateInput(new Date()), color: 'amber' });
 
   useEffect(() => {
-    const saved = localStorage.getItem('solomon_hackathons');
-    if (saved) setHackathons(sortHackathonsByDeadline(JSON.parse(saved)));
+    try { const saved = localStorage.getItem('solomon_hackathons'); setHackathons(saved ? sortHackathonsByDeadline(JSON.parse(saved)) : []); } catch { setHackathons([]); }
+    setHasLoadedHackathons(true);
+  }, []);
+  useEffect(() => { if (hasLoadedHackathons) localStorage.setItem('solomon_hackathons', JSON.stringify(hackathons)); }, [hackathons, hasLoadedHackathons]);
+  useEffect(() => {
+    const loadTasks = () => { try { const saved = localStorage.getItem(CALENDAR_STORAGE_KEY); setTasks(saved ? sanitizeCalendarItems(JSON.parse(saved)) : []); } catch { setTasks([]); } };
+    loadTasks(); window.addEventListener('solomon-calendar-updated', loadTasks); window.addEventListener('storage', loadTasks);
+    return () => { window.removeEventListener('solomon-calendar-updated', loadTasks); window.removeEventListener('storage', loadTasks); };
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('solomon_hackathons', JSON.stringify(hackathons));
-  }, [hackathons]);
-
-  const addHackathon = () => {
-    let finalDeadline = newItem.deadline;
-    let subtasksToSave = newItem.subtasks;
-
-    if (newItem.isMultistage && newItem.subtasks.length > 0) {
-      const normalizedDraft = normalizeHackathon({
-        id: editingId || 'draft',
-        ...newItem,
-      });
-      finalDeadline = normalizedDraft.deadline;
-      subtasksToSave = normalizedDraft.subtasks || [];
-    }
-
-    if (!newItem.name || !finalDeadline) return;
-
-    const itemToSave = { ...newItem, subtasks: subtasksToSave, deadline: finalDeadline };
-
-    if (editingId) {
-      setHackathons(
-        sortHackathonsByDeadline(hackathons.map(h => h.id === editingId ? { ...itemToSave, id: editingId } : h))
-      );
-      setEditingId(null);
-    } else {
-      const hack: Hackathon = {
-        id: Date.now().toString(),
-        ...itemToSave
-      };
-      setHackathons(sortHackathonsByDeadline([...hackathons, hack]));
-    }
-    setNewItem({ name: '', deadline: '', link: '', platform: '', type: 'virtual', isMultistage: false, subtasks: [], priority: 'slate' });
-    setIsAdding(false);
+  const closeHackathon = () => { setIsAdding(false); setEditingId(null); setLinkType('submit'); setNewItem(emptyHackathon); };
+  const saveHackathon = () => {
+    if (!newItem.name.trim() || !newItem.deadline) return;
+    const item = { ...newItem, name: newItem.name.trim(), link: linkType === 'in-person' ? '' : newItem.link };
+    setHackathons((current) => sortHackathonsByDeadline(editingId ? current.map((hackathon) => hackathon.id === editingId ? { ...item, id: editingId } : hackathon) : [...current, { ...item, id: Date.now().toString() }]));
+    closeHackathon();
   };
-
-  const editHackathon = (hackathon: Hackathon) => {
-    setNewItem({
-      name: hackathon.name,
-      deadline: hackathon.deadline,
-      link: hackathon.link,
-      platform: hackathon.platform,
-      type: hackathon.type,
-      isMultistage: hackathon.isMultistage,
-      subtasks: hackathon.subtasks || [],
-      priority: hackathon.priority || 'slate',
-    });
-    setLinkType(hackathon.link ? 'submit' : 'in-person');
-    setEditingId(hackathon.id);
-    setIsAdding(true);
+  const editHackathon = (hackathon: Hackathon) => { setNewItem({ name: hackathon.name, deadline: hackathon.deadline, link: hackathon.link, platform: hackathon.platform, type: hackathon.type, priority: hackathon.priority || 'slate' }); setLinkType(hackathon.link ? 'submit' : 'in-person'); setEditingId(hackathon.id); setIsAdding(true); };
+  const saveTask = () => {
+    if (!task.title.trim() || !isCalendarDateAllowed(task.date)) return;
+    const next = sortCalendarItems([...tasks, { id: `task-${Date.now()}`, title: task.title.trim(), date: task.date, color: task.color, source: 'manual', completed: false }]);
+    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next)); setTasks(next); window.dispatchEvent(new Event('solomon-calendar-updated'));
+    setTask({ title: '', date: formatDateInput(new Date()), color: 'amber' }); setIsAddingTask(false);
   };
+  const deleteTask = (id: string) => { const next = tasks.filter((item) => item.id !== id); localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next)); setTasks(next); window.dispatchEvent(new Event('solomon-calendar-updated')); };
+  const matches = (name: string, color: Priority) => name.toLowerCase().includes(search.toLowerCase()) && (priorityFilter === 'all' || color === priorityFilter);
+  const visibleHackathons = hackathons.filter((hackathon) => (typeFilter === 'all' || hackathon.type === typeFilter) && matches(hackathon.name, hackathon.priority || 'slate'));
+  const visibleTasks = tasks.filter((item) => matches(item.title, item.color));
+  const daysLeft = (date: string) => Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
+  const selectedColour = priorityFilter === 'all' ? 'All colours' : priorityFor(priorityFilter).label;
 
-  const deleteHackathon = (id: string) => {
-    setHackathons(hackathons.filter(h => h.id !== id));
-  };
-
-  const addSubtask = () => {
-    if (!newSubtask.name || !newSubtask.endDate) return;
-    const subtask: Subtask = {
-      id: Date.now().toString(),
-      ...newSubtask,
-      completed: false,
-      status: 'todo'
-    };
-    const updatedSubtasks = [...newItem.subtasks, subtask].sort((a, b) => 
-      parseLocalDate(a.endDate).getTime() - parseLocalDate(b.endDate).getTime()
-    );
-    setNewItem({ ...newItem, subtasks: updatedSubtasks });
-    setNewSubtask({ name: '', endDate: '' });
-  };
-
-  const removeSubtask = (id: string) => {
-    setNewItem({ ...newItem, subtasks: newItem.subtasks.filter(s => s.id !== id) });
-  };
-
-  const completeStage = (hackathonId: string, subtaskId: string) => {
-    setHackathons(prevHackathons => {
-      const hackathon = prevHackathons.find(h => h.id === hackathonId);
-      if (!hackathon || !hackathon.subtasks) return prevHackathons;
-
-      const newSubtasks = hackathon.subtasks
-        .filter(s => s.id !== subtaskId)
-        .sort((a, b) => parseLocalDate(a.endDate).getTime() - parseLocalDate(b.endDate).getTime());
-
-      if (newSubtasks.length === 0) {
-         return prevHackathons.filter(h => h.id !== hackathonId);
-      }
-
-      return sortHackathonsByDeadline(prevHackathons.map(h => {
-        if (h.id !== hackathonId) return h;
-        return normalizeHackathon({
-          ...h,
-          subtasks: newSubtasks,
-        });
-      }));
-    });
-  };
-
-  const toggleSubtask = (hackathonId: string, subtaskId: string) => {
-    setHackathons(prevHackathons => sortHackathonsByDeadline(prevHackathons.map(h => {
-      if (h.id === hackathonId && h.subtasks) {
-        const newSubtasks = h.subtasks.map(s =>
-            s.id === subtaskId ? { 
-              ...s, 
-              completed: !s.completed,
-              status: (!s.completed ? 'done' : 'todo') as 'todo' | 'done'
-            } : s
-          );
-        return normalizeHackathon({
-          ...h,
-          subtasks: newSubtasks,
-        });
-      }
-      return h;
-    })));
-  };
-
-  const updateSubtaskStatus = (hackathonId: string, subtaskId: string, newStatus: 'todo' | 'in-progress' | 'done') => {
-    setHackathons(prevHackathons => sortHackathonsByDeadline(prevHackathons.map(h => {
-      if (h.id === hackathonId && h.subtasks) {
-        const newSubtasks = h.subtasks.map(s => 
-          s.id === subtaskId ? { ...s, status: newStatus, completed: newStatus === 'done' } : s
-        );
-
-        return normalizeHackathon({
-          ...h,
-          subtasks: newSubtasks,
-        });
-      }
-      return h;
-    })));
-  };
-
-  const filteredHackathons = hackathons.filter(h => {
-    const matchesType = activeFilter === 'all' || h.type === activeFilter;
-    const priority = h.priority || 'slate';
-    const matchesPriority = activePriorityFilter === 'all' || priority === activePriorityFilter;
-    const matchesSearch = h.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesType && matchesPriority && matchesSearch;
-  });
-
-  const getDaysRemaining = (deadline: string) => {
-    const diff = new Date(deadline).getTime() - new Date().getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  };
-
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Trophy className="w-6 h-6 text-amber-500" />
-          Hackathon Deadlines
-        </h2>
-        <button 
-          onClick={() => setIsAdding(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-bold transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Track Hackathon
-        </button>
-      </div>
-
-      {/* Filter and Search Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-slate-400 text-sm">
-            <Filter className="w-4 h-4" />
-            <span className="font-bold">Filter:</span>
-          </div>
-          {(['all', 'in-person', 'virtual'] as FilterType[]).map(filter => (
-            <button
-              key={filter}
-              onClick={() => setActiveFilter(filter)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                activeFilter === filter 
-                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' 
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
-              }`}
-            >
-              {filter === 'all' ? 'All' : filter.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-            </button>
-          ))}
-          {([{ value: 'all', label: 'Any Color', activeClass: 'bg-slate-200 text-slate-950 shadow-lg shadow-slate-200/10' }, ...priorityOptions] as const).map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setActivePriorityFilter(option.value as PriorityFilter)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                activePriorityFilter === option.value
-                  ? option.activeClass
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="relative">
-          <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500">
-            <Search className="w-4 h-4" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search hackathons by name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-400 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredHackathons.map(h => {
-          const days = getDaysRemaining(h.deadline);
-          const isUrgent = days >= 0 && days <= 3;
-          const isOver = days < 0;
-          const priority = h.priority || 'slate';
-
-          return (
-            <div key={h.id} className={`bg-slate-900 border ${isUrgent ? 'border-amber-500/50' : priorityCardClasses[priority]} rounded-2xl p-6 relative group overflow-hidden`}>
-              {isUrgent && <div className="absolute top-0 right-0 p-1 bg-amber-500 text-black text-[10px] font-black uppercase px-2 rounded-bl-lg">Urgent</div>}
-              
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-slate-800 rounded-xl text-amber-500">
-                  <Trophy className="w-5 h-5" />
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => editHackathon(h)}
-                    className="p-2 text-slate-600 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => deleteHackathon(h.id)}
-                    className="p-2 text-slate-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <h3 className="text-lg font-bold text-white mb-1 truncate" title={h.name}>{h.name}</h3>
-              <div className="flex items-center gap-2 mb-4">
-                <p className="text-xs text-slate-500">{h.platform || 'Unspecified Platform'}</p>
-                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${
-                  h.type === 'in-person' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'
-                }`}>
-                  {h.type === 'in-person' ? 'In-Person' : 'Virtual'}
-                </span>
-                {h.isMultistage && (
-                  <span className="text-[10px] font-black uppercase px-2 py-1 rounded bg-purple-500/20 text-purple-400">
-                    Multi-Stage
-                  </span>
-                )}
-                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${priorityBadgeClasses[priority]}`}>
-                  {priorityOptions.find((option) => option.value === priority)?.label || 'Not Set'}
-                </span>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-2 text-sm text-slate-300">
-                  <Calendar className="w-4 h-4 text-slate-500" />
-                  {new Date(h.deadline).toLocaleDateString('en-IN', { dateStyle: 'medium' })}
-                </div>
-                <div className={`flex items-center gap-2 text-sm font-bold ${isOver ? 'text-slate-600' : isUrgent ? 'text-amber-500' : 'text-emerald-500'}`}>
-                  <Clock className="w-4 h-4" />
-                  {isOver ? 'Ended' : `${days} Days Left`}
-                </div>
-              </div>
-
-              {/* Subtasks Section - Only show if multistage */}
-              {h.isMultistage && (
-                <div className="mb-6 space-y-2">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Current Submission Stage</p>
-                  {h.subtasks && h.subtasks.length > 0 ? (() => {
-                    const sortedSubtasks = [...h.subtasks].sort((a, b) => parseLocalDate(a.endDate).getTime() - parseLocalDate(b.endDate).getTime());
-                    const activeSubtask = sortedSubtasks.find(s => !s.completed);
-                    const totalStages = sortedSubtasks.length;
-                    const completedCount = sortedSubtasks.filter(s => s.completed).length;
-
-                    if (!activeSubtask) return null; // Should not happen if we auto-delete, but acts as fallback
-
-                    return (
-                        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                          <div className="flex justify-between items-start mb-3">
-                             <div>
-                                <h4 className="font-bold text-white text-md">{activeSubtask.name}</h4>
-                                <p className="text-xs text-slate-400 mt-1">Stage {completedCount + 1} of {totalStages}</p>
-                             </div>
-                             <div className="text-right">
-                                <p className="text-xs font-bold text-amber-500">Due {new Date(activeSubtask.endDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</p>
-                                <p className="text-[10px] text-slate-500 mt-1">
-                                  {Math.ceil((new Date(activeSubtask.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days left
-                                </p>
-                             </div>
-                          </div>
-                          
-                          <button
-                            onClick={() => completeStage(h.id, activeSubtask.id)}
-                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Complete This Stage
-                          </button>
-                        </div>
-                    );
-                  })() : (
-                    <div className="p-2 bg-slate-800/30 rounded-lg border border-slate-800/50">
-                      <p className="text-xs text-slate-600 text-center">No stages added yet</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {h.link ? (
-                <a 
-                  href={h.link.startsWith('http') ? h.link : `https://${h.link}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center justify-center gap-2 text-sm transition-all"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View Details
-                </a>
-              ) : (
-                <div className="w-full py-2 bg-emerald-900/20 border border-emerald-700/30 text-emerald-400 rounded-lg flex items-center justify-center gap-2 text-sm">
-                  <CheckCircle className="w-4 h-4" />
-                  Attending In Person
-                </div>
-              )}
-
-
-            </div>
-          );
-        })}
-
-        {filteredHackathons.length === 0 && !isAdding && (
-          <div className="col-span-full py-20 bg-slate-900/30 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-slate-500">
-            <Trophy className="w-12 h-12 mb-4 opacity-20" />
-            <p>
-              {searchQuery 
-                ? `No hackathons matching "${searchQuery}" ${activeFilter !== 'all' ? `(${activeFilter})` : ''}${activePriorityFilter !== 'all' ? ` (${activePriorityFilter})` : ''}.` 
-                : `No hackathons ${activeFilter !== 'all' ? `(${activeFilter})` : ''}${activePriorityFilter !== 'all' ? ` (${activePriorityFilter})` : ''} tracked yet. Ready to build something great?`}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {isAdding && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto styled-scrollbar p-8 shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-black text-white mb-6">{editingId ? 'Edit Hackathon' : 'Track New Hackathon'}</h3>
-            <div className="space-y-4 mb-8">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Hackathon Name</label>
-                <input 
-                  autoFocus
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  value={newItem.name}
-                  onChange={e => setNewItem({...newItem, name: e.target.value})}
-                  placeholder="e.g., Google HashCode"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Hackathon Type</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {(['in-person', 'virtual'] as const).map(type => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setNewItem({...newItem, type})}
-                      className={`px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-                        newItem.type === type
-                          ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20'
-                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                      }`}
-                    >
-                      {type === 'in-person' ? 'In-Person' : 'Virtual'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {!newItem.isMultistage ? (
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Deadline Date</label>
-                <input 
-                  type="date"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  value={newItem.deadline}
-                  onChange={e => setNewItem({...newItem, deadline: e.target.value})}
-                />
-              </div>
-              ) : (
-                <div className="p-4 bg-slate-800/30 rounded-xl border border-slate-800">
-                  <p className="text-sm text-slate-400">
-                    <span className="text-amber-500 font-bold">Note:</span> For multi-stage hackathons, the overall deadline is automatically tied to the current active submission stage and moves forward as each stage is completed.
-                  </p>
-                </div>
-              )}
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Platform / Organizer</label>
-                <input 
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  value={newItem.platform}
-                  onChange={e => setNewItem({...newItem, platform: e.target.value})}
-                  placeholder="e.g., Devpost, Unstop"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Color / Priority Optional</label>
-                <p className="mb-3 text-xs text-slate-500">If you leave this unset, the hackathon shows in gray by default.</p>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {priorityOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setNewItem({ ...newItem, priority: option.value })}
-                      className={`px-3 py-3 rounded-xl text-xs font-bold transition-all ${
-                        newItem.priority === option.value
-                          ? option.activeClass
-                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Application Method</label>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLinkType('submit');
-                      if (linkType === 'in-person') setNewItem({...newItem, link: ''});
-                    }}
-                    className={`px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-                      linkType === 'submit'
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                    }`}
-                  >
-                    Submit Link
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLinkType('in-person');
-                      setNewItem({...newItem, link: ''});
-                    }}
-                    className={`px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-                      linkType === 'in-person'
-                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                    }`}
-                  >
-                    Attending In Person
-                  </button>
-                </div>
-                {linkType === 'submit' ? (
-                  <input 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={newItem.link}
-                    onChange={e => setNewItem({...newItem, link: e.target.value})}
-                    placeholder="https://hackathon.com"
-                  />
-                ) : (
-                  <div className="w-full bg-emerald-900/20 border border-emerald-700/30 rounded-xl px-4 py-3 text-emerald-400 text-sm font-medium text-center">
-                    ✓ Will attend in person
-                  </div>
-                )}
-              </div>
-
-              {/* Multi-Stage Toggle - Moved to bottom */}
-              <div className="border-t border-slate-800 pt-4">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Multi-Stage Hackathon</label>
-                <button
-                  type="button"
-                  onClick={() => setNewItem({...newItem, isMultistage: !newItem.isMultistage})}
-                  className={`w-full px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                    newItem.isMultistage
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  <div className={`w-12 h-6 rounded-full transition-all relative ${
-                    newItem.isMultistage ? 'bg-purple-800' : 'bg-slate-700'
-                  }`}>
-                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
-                      newItem.isMultistage ? 'translate-x-6' : 'translate-x-0.5'
-                    }`} />
-                  </div>
-                  {newItem.isMultistage ? 'Multiple Submission Stages' : 'Single Stage'}
-                </button>
-              </div>
-
-              {/* Subtasks Section - Only show if multistage is enabled */}
-              {newItem.isMultistage && (
-              <div className="pt-4">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">Submission Deadlines (Multi-Day)</label>
-                
-                {/* Add Subtask Form */}
-                <div className="bg-slate-800/50 rounded-xl p-4 mb-3 space-y-3">
-                  <input 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    value={newSubtask.name}
-                    onChange={e => setNewSubtask({...newSubtask, name: e.target.value})}
-                    placeholder="e.g., Proposal Submission"
-                  />
-                  <div className="mb-2">
-                    <label className="text-[10px] text-slate-600 uppercase mb-1 block">Deadline Date</label>
-                    <input 
-                      type="date"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      value={newSubtask.endDate}
-                      onChange={e => setNewSubtask({...newSubtask, endDate: e.target.value})}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addSubtask}
-                    className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-bold transition-colors"
-                  >
-                    Add Submission
-                  </button>
-                </div>
-
-                {/* Subtasks List */}
-                {newItem.subtasks.length > 0 && (
-                  <div className="space-y-2">
-                    {newItem.subtasks.map(subtask => (
-                      <div key={subtask.id} className="flex items-center gap-2 bg-slate-800 rounded-lg p-3">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-white">{subtask.name}</p>
-                          <p className="text-xs text-slate-500">
-                             Due {new Date(subtask.endDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeSubtask(subtask.id)}
-                          className="p-2 text-slate-600 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              )}
-            </div>
-            <div className="flex gap-4">
-              <button 
-                onClick={() => {
-                  setIsAdding(false);
-                  setEditingId(null);
-                  setLinkType('submit');
-                  setNewItem({ name: '', deadline: '', link: '', platform: '', type: 'virtual', isMultistage: false, subtasks: [], priority: 'slate' });
-                }}
-                className="flex-1 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold hover:bg-slate-700 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={addHackathon}
-                className="flex-1 py-3 bg-amber-600 text-white rounded-xl font-black hover:bg-amber-500 transition-colors shadow-lg shadow-amber-600/20"
-              >
-                {editingId ? 'Update Hackathon' : 'Start Tracking'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-2xl font-bold text-white"><Trophy className="h-6 w-6 text-amber-500" />Hackathon Deadlines</h2><div className="flex gap-2"><button onClick={() => setIsAddingTask(true)} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500"><Plus className="h-4 w-4" />Add Task</button><button onClick={() => setIsAdding(true)} className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-500"><Plus className="h-4 w-4" />Track Hackathon</button></div></div>
+    <div className="space-y-4"><div className="flex flex-wrap items-center gap-3"><div className="flex items-center gap-2 text-sm text-slate-400"><Filter className="h-4 w-4" /><span className="font-bold">Show:</span></div>{([{ value: 'all', label: 'All' }, { value: 'hackathons', label: 'Hackathons' }, { value: 'tasks', label: 'Tasks' }] as const).map((option) => <button key={option.value} onClick={() => setContentFilter(option.value)} className={`rounded-lg px-4 py-2 text-sm font-bold ${contentFilter === option.value ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>{option.label}</button>)}<span className="ml-1 text-xs font-bold uppercase tracking-widest text-slate-500">Hackathon type</span>{(['all', 'in-person', 'virtual'] as TypeFilter[]).map((value) => <button key={value} onClick={() => setTypeFilter(value)} className={`rounded-lg px-3 py-2 text-sm font-bold ${typeFilter === value ? 'bg-slate-200 text-slate-950' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>{value === 'all' ? 'All' : value === 'in-person' ? 'In Person' : 'Virtual'}</button>)}<div className="relative"><button onClick={() => setColourOpen((open) => !open)} className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold ${priorityFilter === 'all' ? 'bg-slate-800 text-slate-300' : priorityFor(priorityFilter).picker}`}><span>{selectedColour}</span><ChevronDown className={`h-4 w-4 transition-transform ${colourOpen ? 'rotate-180' : ''}`} /></button>{colourOpen && <div className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-700 bg-slate-900 p-2 shadow-2xl">{([{ value: 'all', label: 'All colours' }, ...priorities] as const).map((option) => <button key={option.value} onClick={() => { setPriorityFilter(option.value); setColourOpen(false); }} className={`mb-1 block w-full rounded-lg px-3 py-2 text-left text-sm font-bold last:mb-0 ${option.value === 'all' ? 'bg-slate-800 text-white hover:bg-slate-700' : option.picker}`}>{option.label}</button>)}</div>}</div></div><div className="relative"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks and hackathons..." className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pl-10 pr-10 text-white outline-none focus:ring-2 focus:ring-amber-500" />{search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"><X className="h-4 w-4" /></button>}</div></div>
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">{contentFilter !== 'tasks' && visibleHackathons.map((hackathon) => <HackathonCard key={hackathon.id} hackathon={hackathon} onEdit={() => editHackathon(hackathon)} onDelete={() => setHackathons((current) => current.filter((item) => item.id !== hackathon.id))} daysLeft={daysLeft(hackathon.deadline)} />)}{contentFilter !== 'hackathons' && visibleTasks.map((item) => <TaskCard key={item.id} item={item} onDelete={() => deleteTask(item.id)} />)}{((contentFilter === 'hackathons' && !visibleHackathons.length) || (contentFilter === 'tasks' && !visibleTasks.length) || (contentFilter === 'all' && !visibleHackathons.length && !visibleTasks.length)) && <div className="col-span-full flex flex-col items-center rounded-3xl border-2 border-dashed border-slate-800 bg-slate-900/30 py-20 text-slate-500"><Trophy className="mb-4 h-12 w-12 opacity-20" /><p>No matching {contentFilter === 'all' ? 'items' : contentFilter} yet.</p></div>}</div>
+    {(isAdding || isAddingTask) && <Modal>{isAdding ? <HackathonForm item={newItem} setItem={setNewItem} linkType={linkType} setLinkType={setLinkType} editing={Boolean(editingId)} onCancel={closeHackathon} onSave={saveHackathon} /> : <TaskForm task={task} setTask={setTask} onCancel={() => setIsAddingTask(false)} onSave={saveTask} />}</Modal>}
+  </div>;
 };
 
+const HackathonCard: React.FC<{ hackathon: Hackathon; daysLeft: number; onEdit: () => void; onDelete: () => void }> = ({ hackathon, daysLeft, onEdit, onDelete }) => { const priority = priorityFor(hackathon.priority); return <div className={`group relative overflow-hidden rounded-2xl border p-6 ${priority.card}`}><div className="mb-4 flex items-start justify-between"><div className={`rounded-xl border p-3 ${priority.panel}`}><Trophy className="h-5 w-5" /></div><div className="flex gap-1 opacity-0 transition group-hover:opacity-100"><button onClick={onEdit} className="p-2 opacity-70 hover:opacity-100"><Edit2 className="h-4 w-4" /></button><button onClick={onDelete} className="p-2 opacity-70 hover:opacity-100"><Trash2 className="h-4 w-4" /></button></div></div><h3 className="truncate text-lg font-bold">{hackathon.name}</h3><div className={`mb-5 mt-1 flex flex-wrap items-center gap-2 ${priority.muted}`}><span className="text-xs">{hackathon.platform || 'Unspecified Platform'}</span><span className={`rounded border px-2 py-1 text-[10px] font-black uppercase ${priority.panel}`}>{hackathon.type === 'in-person' ? 'In Person' : 'Virtual'}</span><span className={`rounded border px-2 py-1 text-[10px] font-black uppercase ${priority.panel}`}>{priority.label}</span></div><div className="mb-6 space-y-3"><div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 opacity-65" />{new Date(hackathon.deadline).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</div><div className="flex items-center gap-2 text-sm font-bold"><Clock className="h-4 w-4" />{daysLeft < 0 ? 'Ended' : `${daysLeft} Days Left`}</div></div>{hackathon.link ? <a href={hackathon.link.startsWith('http') ? hackathon.link : `https://${hackathon.link}`} target="_blank" rel="noreferrer" className={`flex w-full items-center justify-center gap-2 rounded-lg border py-2 text-sm font-bold ${priority.panel}`}><ExternalLink className="h-4 w-4" />View Details</a> : <div className={`flex w-full items-center justify-center gap-2 rounded-lg border py-2 text-sm font-bold ${priority.panel}`}><CheckCircle className="h-4 w-4" />Attending In Person</div>}</div> };
+const TaskCard: React.FC<{ item: CalendarItem; onDelete: () => void }> = ({ item, onDelete }) => { const priority = priorityFor(item.color); return <div className={`group relative overflow-hidden rounded-2xl border p-6 ${priority.card}`}><div className="mb-4 flex items-start justify-between"><div className={`rounded-xl border p-3 ${priority.panel}`}><Calendar className="h-5 w-5" /></div><button onClick={onDelete} className="p-2 opacity-0 transition group-hover:opacity-70 hover:opacity-100"><Trash2 className="h-4 w-4" /></button></div><p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-65">Scheduled Task</p><h3 className="mt-1 truncate text-lg font-bold">{item.title}</h3><div className={`mt-4 flex items-center gap-2 text-sm ${priority.muted}`}><Calendar className="h-4 w-4" />{new Date(item.date).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</div><div className={`mt-6 flex w-full items-center justify-center gap-2 rounded-lg border py-2 text-sm font-bold ${priority.panel}`}><CheckCircle className="h-4 w-4" />{item.completed ? 'Completed' : priority.label}</div></div> };
+const Modal: React.FC<{ children: React.ReactNode }> = ({ children }) => <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"><div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">{children}</div></div>;
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => <div><label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-500">{label}</label><div className="[&_input]:w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-slate-700 [&_input]:bg-slate-800 [&_input]:px-4 [&_input]:py-3 [&_input]:text-white [&_input]:outline-none [&_input]:focus:ring-2 [&_input]:focus:ring-amber-500">{children}</div></div>;
+const Picker: React.FC<{ value: Priority; onChange: (value: Priority) => void }> = ({ value, onChange }) => <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{priorities.map((priority) => <button key={priority.value} onClick={() => onChange(priority.value)} className={`rounded-xl px-3 py-3 text-xs font-bold ${priority.picker} ${value === priority.value ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900' : 'opacity-70 hover:opacity-100'}`}>{priority.label}</button>)}</div>;
+const Actions: React.FC<{ onCancel: () => void; onSave: () => void; label: string }> = ({ onCancel, onSave, label }) => <div className="mt-8 flex gap-4"><button onClick={onCancel} className="flex-1 rounded-xl bg-slate-800 py-3 font-bold text-slate-300 hover:bg-slate-700">Cancel</button><button onClick={onSave} className="flex-1 rounded-xl bg-amber-600 py-3 font-black text-white hover:bg-amber-500">{label}</button></div>;
+const HackathonForm: React.FC<{ item: Omit<Hackathon, 'id'>; setItem: React.Dispatch<React.SetStateAction<Omit<Hackathon, 'id'>>>; linkType: 'submit' | 'in-person'; setLinkType: React.Dispatch<React.SetStateAction<'submit' | 'in-person'>>; editing: boolean; onCancel: () => void; onSave: () => void }> = ({ item, setItem, linkType, setLinkType, editing, onCancel, onSave }) => <><h3 className="mb-6 text-2xl font-black text-white">{editing ? 'Edit Hackathon' : 'Track New Hackathon'}</h3><div className="space-y-4"><Field label="Hackathon Name"><input autoFocus value={item.name} onChange={(e) => setItem({ ...item, name: e.target.value })} /></Field><Field label="Hackathon Type"><div className="grid grid-cols-2 gap-3">{(['in-person', 'virtual'] as const).map((type) => <button key={type} onClick={() => setItem({ ...item, type })} className={`rounded-xl px-4 py-3 text-sm font-bold ${item.type === type ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{type === 'in-person' ? 'In Person' : 'Virtual'}</button>)}</div></Field><Field label="Deadline Date"><input type="date" value={item.deadline} onChange={(e) => setItem({ ...item, deadline: e.target.value })} /></Field><Field label="Platform / Organizer"><input value={item.platform} onChange={(e) => setItem({ ...item, platform: e.target.value })} /></Field><Field label="Tag colour"><Picker value={item.priority || 'slate'} onChange={(priority) => setItem({ ...item, priority })} /></Field><Field label="Application Method"><div className="mb-3 grid grid-cols-2 gap-3"><button onClick={() => setLinkType('submit')} className={`rounded-xl px-4 py-3 text-sm font-bold ${linkType === 'submit' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Submit Link</button><button onClick={() => { setLinkType('in-person'); setItem({ ...item, link: '' }); }} className={`rounded-xl px-4 py-3 text-sm font-bold ${linkType === 'in-person' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Attending In Person</button></div>{linkType === 'submit' ? <input value={item.link} onChange={(e) => setItem({ ...item, link: e.target.value })} /> : <div className="rounded-xl bg-emerald-900/20 px-4 py-3 text-center text-sm font-medium text-emerald-400">Will attend in person</div>}</Field></div><Actions onCancel={onCancel} onSave={onSave} label={editing ? 'Update Hackathon' : 'Start Tracking'} /></>;
+const TaskForm: React.FC<{ task: { title: string; date: string; color: CalendarItem['color'] }; setTask: React.Dispatch<React.SetStateAction<{ title: string; date: string; color: CalendarItem['color'] }>>; onCancel: () => void; onSave: () => void }> = ({ task, setTask, onCancel, onSave }) => <><h3 className="text-2xl font-black text-white">Add Scheduled Task</h3><p className="mt-1 text-sm text-slate-400">It will also appear in Solomon’s Order and Daily To-Do on its date.</p><div className="mt-6 space-y-4"><Field label="Task"><input autoFocus value={task.title} onChange={(e) => setTask({ ...task, title: e.target.value })} /></Field><Field label="Date"><input type="date" min="2026-01-01" max={getCalendarMaxDate()} value={task.date} onChange={(e) => setTask({ ...task, date: e.target.value })} /></Field><Field label="Tag colour"><Picker value={task.color} onChange={(color) => setTask({ ...task, color })} /></Field></div><Actions onCancel={onCancel} onSave={onSave} label="Add to Calendar" /></>;
 export default HackathonTracker;

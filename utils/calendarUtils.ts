@@ -1,4 +1,4 @@
-import { CalendarItem, Hackathon, Subtask } from '../types';
+import { CalendarItem, Hackathon } from '../types';
 
 export const CALENDAR_STORAGE_KEY = 'solomon_order_calendar';
 export const CALENDAR_MIN_DATE = '2026-01-01';
@@ -49,33 +49,11 @@ export const clampMonthToCalendarRange = (date: Date, now = new Date()): Date =>
   return monthStart;
 };
 
-const sortSubtasks = (subtasks: Subtask[] = []): Subtask[] =>
-  [...subtasks].sort((left, right) => compareDateStrings(left.endDate, right.endDate));
-
-export const getHackathonActiveSubtask = (hackathon: Hackathon): Subtask | undefined => {
-  if (!hackathon.isMultistage || !hackathon.subtasks?.length) return undefined;
-  const sortedSubtasks = sortSubtasks(hackathon.subtasks);
-  return sortedSubtasks.find((subtask) => !subtask.completed) || sortedSubtasks[sortedSubtasks.length - 1];
-};
-
 export const normalizeHackathon = (hackathon: Hackathon): Hackathon => {
-  const priority = hackathon.priority || 'slate';
-
-  if (!hackathon.isMultistage || !hackathon.subtasks?.length) {
-    return {
-      ...hackathon,
-      priority,
-    };
-  }
-
-  const sortedSubtasks = sortSubtasks(hackathon.subtasks);
-  const activeSubtask = sortedSubtasks.find((subtask) => !subtask.completed) || sortedSubtasks[sortedSubtasks.length - 1];
-
+  const { isMultistage: _legacyMultistage, subtasks: _legacySubtasks, ...cleanHackathon } = hackathon as Hackathon & { isMultistage?: boolean; subtasks?: unknown };
   return {
-    ...hackathon,
-    priority,
-    subtasks: sortedSubtasks,
-    deadline: activeSubtask?.endDate || hackathon.deadline,
+    ...cleanHackathon,
+    priority: cleanHackathon.priority || 'slate',
   };
 };
 
@@ -111,5 +89,6 @@ export const sanitizeCalendarItems = (items: CalendarItem[], now = new Date()): 
         ...item,
         title: item.title.trim(),
         source: 'manual' as const,
+        completed: Boolean(item.completed),
       }))
   );

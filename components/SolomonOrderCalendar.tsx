@@ -46,6 +46,7 @@ const getMonthDays = (month: Date): Date[] => {
 const SolomonOrderCalendar: React.FC = () => {
   const [viewMonth, setViewMonth] = useState(() => clampMonthToCalendarRange(new Date()));
   const [manualItems, setManualItems] = useState<CalendarItem[]>([]);
+  const [hasLoadedCalendar, setHasLoadedCalendar] = useState(false);
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -56,28 +57,45 @@ const SolomonOrderCalendar: React.FC = () => {
   });
 
   useEffect(() => {
-    try {
+    const loadCalendar = () => {
+      try {
       const savedCalendar = localStorage.getItem(CALENDAR_STORAGE_KEY);
       if (savedCalendar) {
         setManualItems(sanitizeCalendarItems(JSON.parse(savedCalendar)));
+      } else {
+        setManualItems([]);
       }
-    } catch (error) {
-      console.error('Failed to parse saved calendar items', error);
-    }
+      } catch (error) {
+        console.error('Failed to parse saved calendar items', error);
+      }
+    };
 
-    try {
+    const loadHackathons = () => {
+      try {
       const savedHackathons = localStorage.getItem('solomon_hackathons');
       if (savedHackathons) {
         setHackathons(sortHackathonsByDeadline(JSON.parse(savedHackathons)));
+      } else {
+        setHackathons([]);
       }
-    } catch (error) {
-      console.error('Failed to parse hackathons for calendar', error);
-    }
+      } catch (error) {
+        console.error('Failed to parse hackathons for calendar', error);
+      }
+    };
+    loadCalendar();
+    loadHackathons();
+    setHasLoadedCalendar(true);
+    window.addEventListener('solomon-calendar-updated', loadCalendar);
+    window.addEventListener('storage', loadCalendar);
+    return () => {
+      window.removeEventListener('solomon-calendar-updated', loadCalendar);
+      window.removeEventListener('storage', loadCalendar);
+    };
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(sanitizeCalendarItems(manualItems)));
-  }, [manualItems]);
+    if (hasLoadedCalendar) localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(sanitizeCalendarItems(manualItems)));
+  }, [manualItems, hasLoadedCalendar]);
 
   const minMonth = useMemo(() => new Date(2026, 0, 1), []);
   const maxMonth = useMemo(() => {
