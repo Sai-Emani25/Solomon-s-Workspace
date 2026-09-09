@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, Plus, Trash2, Trophy, X } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Edit2, ExternalLink, Plus, Trash2, Trophy, X } from 'lucide-react';
 import { CalendarItem, Hackathon } from '../types';
 import {
   CALENDAR_MIN_DATE,
@@ -49,10 +49,12 @@ const SolomonOrderCalendar: React.FC = () => {
   const [hasLoadedCalendar, setHasLoadedCalendar] = useState(false);
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ title: string; date: string; color: CalendarItem['color'] }>({
+  const [draft, setDraft] = useState<{ title: string; date: string; time: string; color: CalendarItem['color'] }>({
     title: '',
     date: formatDateInput(clampMonthToCalendarRange(new Date())),
+    time: '',
     color: 'rose',
   });
 
@@ -131,28 +133,24 @@ const SolomonOrderCalendar: React.FC = () => {
     const title = draft.title.trim();
     if (!title || !isCalendarDateAllowed(draft.date)) return;
 
-    setManualItems((previous) => sanitizeCalendarItems([
-      ...previous,
-      {
-        id: Date.now().toString(),
-        title,
-        date: draft.date,
-        color: draft.color,
-        source: 'manual',
-      },
-    ]));
+    setManualItems((previous) => sanitizeCalendarItems(editingItemId
+      ? previous.map((item) => item.id === editingItemId ? { ...item, title, date: draft.date, time: draft.time || undefined, color: draft.color } : item)
+      : [...previous, { id: Date.now().toString(), title, date: draft.date, time: draft.time || undefined, color: draft.color, source: 'manual' }]
+    ));
 
     setDraft({
       title: '',
       date: formatDateInput(viewMonth),
+      time: '',
       color: draft.color,
     });
-    setIsAdding(false);
+    setEditingItemId(null); setIsAdding(false);
   };
 
   const removeItem = (id: string) => {
     setManualItems((previous) => previous.filter((item) => item.id !== id));
   };
+  const editItem = (item: CalendarItem) => { setDraft({ title: item.title, date: item.date, time: item.time || '', color: item.color }); setEditingItemId(item.id); setExpandedDate(null); setIsAdding(true); };
 
   const moveMonth = (direction: -1 | 1) => {
     setViewMonth((previous) => clampMonthToCalendarRange(new Date(previous.getFullYear(), previous.getMonth() + direction, 1)));
@@ -172,7 +170,7 @@ const SolomonOrderCalendar: React.FC = () => {
             </div>
             <button
               onClick={() => {
-                setDraft((previous) => ({ ...previous, date: formatDateInput(viewMonth) }));
+                setEditingItemId(null); setDraft({ title: '', date: formatDateInput(viewMonth), time: '', color: 'rose' });
                 setIsAdding(true);
               }}
               className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-3 py-1.5 text-[11px] font-black text-slate-950 transition-colors hover:bg-amber-300"
@@ -318,7 +316,7 @@ const SolomonOrderCalendar: React.FC = () => {
       {isAdding && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-950 p-6 shadow-2xl">
-            <h3 className="text-xl font-black text-white">Add Order Item</h3>
+            <h3 className="text-xl font-black text-white">{editingItemId ? 'Edit Order Item' : 'Add Order Item'}</h3>
             <p className="mt-1 text-sm text-slate-400">Saved items stay within the supported calendar range only.</p>
 
             <div className="mt-5 space-y-4">
@@ -346,6 +344,11 @@ const SolomonOrderCalendar: React.FC = () => {
               </div>
 
               <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Time (optional)</label>
+                <input type="time" value={draft.time} onChange={(event) => setDraft((previous) => ({ ...previous, time: event.target.value }))} className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-amber-400" />
+              </div>
+
+              <div>
                 <label className="mb-2 block text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Color</label>
                 <div className="grid grid-cols-4 gap-2">
                   {priorityOptions.map((color) => (
@@ -366,7 +369,7 @@ const SolomonOrderCalendar: React.FC = () => {
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => setIsAdding(false)}
+                onClick={() => { setIsAdding(false); setEditingItemId(null); }}
                 className="flex-1 rounded-2xl bg-slate-800 px-4 py-3 font-bold text-slate-300 transition hover:bg-slate-700"
               >
                 Cancel
@@ -376,7 +379,7 @@ const SolomonOrderCalendar: React.FC = () => {
                 disabled={!draft.title.trim() || !isCalendarDateAllowed(draft.date)}
                 className="flex-1 rounded-2xl bg-amber-400 px-4 py-3 font-black text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Save Item
+                {editingItemId ? 'Save Changes' : 'Save Item'}
               </button>
             </div>
           </div>
@@ -411,6 +414,7 @@ const SolomonOrderCalendar: React.FC = () => {
                       <p className="text-sm font-black">{item.title}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] opacity-75">
                         <span>{item.source === 'hackathon' ? 'Hackathon' : 'Manual Item'}</span>
+                        {item.time && <span>{item.time}</span>}
                         {item.color === 'rose' && <span>Highly Imp</span>}
                         {item.color === 'amber' && <span>Priority</span>}
                         {item.color === 'emerald' && <span>Low Priority</span>}
@@ -430,6 +434,9 @@ const SolomonOrderCalendar: React.FC = () => {
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>
+                      )}
+                      {item.source === 'manual' && (
+                        <button type="button" onClick={() => editItem(item)} className="rounded-full border border-black/10 bg-white/30 p-2 transition-colors hover:bg-white/45" aria-label={`Edit ${item.title}`}><Edit2 className="h-4 w-4" /></button>
                       )}
                       {item.source === 'manual' && (
                         <button

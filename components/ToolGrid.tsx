@@ -18,6 +18,7 @@ import {
 import { ToolType, FileProcessingState } from '../types';
 import {
   compressImage,
+  convertPptxToPdf,
   requiresExternalService,
   getExternalServiceUrl,
   ACCEPTED_FILE_TYPES,
@@ -82,6 +83,17 @@ const ToolGrid: React.FC = () => {
           resultUrl: null,
           error: result.error || 'Compression failed'
         });
+      }
+      return;
+    }
+
+    if (activeTool === ToolType.PPT_TO_PDF) {
+      setFileState({ isProcessing: true, progress: 0, resultUrl: null, error: null });
+      const result = await convertPptxToPdf(file, (progress) => setFileState(prev => ({ ...prev, progress })));
+      if (result.success) {
+        setFileState({ isProcessing: false, progress: 100, resultUrl: result.resultUrl!, error: null, fileName: result.fileName, originalSize: result.originalSize, newSize: result.newSize });
+      } else {
+        setFileState({ isProcessing: false, progress: 0, resultUrl: null, error: result.error || 'Conversion failed' });
       }
       return;
     }
@@ -163,30 +175,20 @@ const ToolGrid: React.FC = () => {
           </div>
 
           <div className="max-w-xl mx-auto">
-            {/* External Service Redirect UI */}
+            {/* Planned converters */}
             {requiresExternalService(activeTool) && !fileState.isProcessing && !fileState.resultUrl && (
               <div className="flex flex-col items-center py-8 text-center">
                 <div className="p-4 bg-amber-500/10 rounded-full mb-6">
                   <ExternalLink className="w-12 h-12 text-amber-500" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">External Service Required</h3>
+                <h3 className="text-xl font-bold text-white mb-2">Coming Soon</h3>
                 <p className="text-slate-400 mb-6 max-w-sm">
-                  {TOOL_DESCRIPTIONS[activeTool]} This conversion requires an external service for accurate results.
-                </p>
-                <button
-                  onClick={handleExternalRedirect}
-                  className="flex items-center gap-2 px-8 py-3 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-xl transition-all hover:scale-105"
-                >
-                  <ExternalLink className="w-5 h-5" />
-                  Open Conversion Tool
-                </button>
-                <p className="text-xs text-slate-500 mt-4">
-                  You'll be redirected to a free, trusted conversion service.
+                  {TOOL_DESCRIPTIONS[activeTool]} This converter is being prepared for a future update.
                 </p>
               </div>
             )}
 
-            {/* File Upload UI (only for client-side processing tools like image compression) */}
+            {/* File Upload UI for local tools */}
             {!requiresExternalService(activeTool) && !fileState.isProcessing && !fileState.resultUrl && !fileState.error && (
               <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-slate-800 border-dashed rounded-3xl cursor-pointer bg-slate-800/20 hover:bg-slate-800/40 transition-all group">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -295,7 +297,7 @@ const ToolGrid: React.FC = () => {
                     onClick={reset}
                     className="px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all"
                   >
-                    Compress Another
+                    Process Another
                   </button>
                 </div>
               </div>

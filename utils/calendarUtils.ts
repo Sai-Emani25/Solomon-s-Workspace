@@ -70,6 +70,9 @@ export const sortCalendarItems = (items: CalendarItem[]): CalendarItem[] =>
     const dateDiff = compareDateStrings(left.date, right.date);
     if (dateDiff !== 0) return dateDiff;
 
+    const timeDiff = (left.time || '99:99').localeCompare(right.time || '99:99');
+    if (timeDiff !== 0) return timeDiff;
+
     const priorityDiff = compareCalendarItemPriority(left.color, right.color);
     if (priorityDiff !== 0) return priorityDiff;
 
@@ -88,6 +91,7 @@ export const sanitizeCalendarItems = (items: CalendarItem[], now = new Date()): 
       .map((item) => ({
         ...item,
         title: item.title.trim(),
+        time: /^([01]\d|2[0-3]):[0-5]\d$/.test(item.time || '') ? item.time : undefined,
         source: 'manual' as const,
         completed: Boolean(item.completed),
       }))

@@ -47,6 +47,8 @@ export interface CalendarItem {
   id: string;
   title: string;
   date: string;
+  /** Local time in 24-hour HH:mm format. Tasks without a time sort after timed tasks. */
+  time?: string;
   color: 'amber' | 'emerald' | 'rose' | 'blue' | 'slate';
   source?: 'manual' | 'hackathon';
   link?: string;
