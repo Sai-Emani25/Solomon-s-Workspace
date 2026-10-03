@@ -69,10 +69,21 @@ const HackathonTracker: React.FC = () => {
   };
   const editTask = (item: CalendarItem) => { setTask({ title: item.title, date: item.date, time: item.time || '', color: item.color, recurrence: item.recurrence || 'none' }); setEditingTaskId(item.id); setIsAddingTask(true); };
   const deleteTask = (id: string) => { const next = tasks.filter((item) => item.id !== id); localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next)); setTasks(next); window.dispatchEvent(new Event('solomon-calendar-updated')); };
-  const moveTaskToToday = (id: string) => { const next = sortCalendarItems(tasks.map((item) => item.id === id ? { ...item, date: formatDateInput(new Date()), completed: false } : item)); localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next)); setTasks(next); window.dispatchEvent(new Event('solomon-calendar-updated')); };
+  const moveTaskToToday = (id: string) => { const next = sortCalendarItems(tasks.map((item) => item.id === id ? { ...item, date: formatDateInput(new Date()), completed: false, completedDates: [], recurrence: 'none' } : item)); localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next)); setTasks(next); window.dispatchEvent(new Event('solomon-calendar-updated')); };
+  const completeTask = (item: CalendarItem) => {
+    const next = sortCalendarItems(tasks.flatMap((current) => {
+      if (current.id !== item.id) return [current];
+      if (current.recurrence === 'daily' || current.recurrence === 'weekly') {
+        return [{ ...current, completedDates: [...new Set([...(current.completedDates || []), today])] }];
+      }
+      return [];
+    }));
+    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next)); setTasks(next); window.dispatchEvent(new Event('solomon-calendar-updated'));
+  };
   const matches = (name: string, color: Priority) => name.toLowerCase().includes(search.toLowerCase()) && (priorityFilter === 'all' || color === priorityFilter);
   const visibleHackathons = hackathons.filter((hackathon) => (typeFilter === 'all' || hackathon.type === typeFilter) && matches(hackathon.name, hackathon.priority || 'slate'));
-  const visibleTasks = tasks.filter((item) => matches(item.title, item.color));
+  const today = formatDateInput(new Date());
+  const visibleTasks = tasks.filter((item) => matches(item.title, item.color) && !(item.recurrence && item.completedDates?.includes(today)));
   const daysLeft = (date: string) => Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
   const selectedColour = priorityFilter === 'all' ? 'All colours' : priorityFor(priorityFilter).label;
   const allByDate = [...new Set([...visibleHackathons.map((item) => item.deadline), ...visibleTasks.map((item) => item.date)])].sort().map((date) => ({

@@ -54,6 +54,7 @@ export interface CalendarItem {
   source?: 'manual' | 'hackathon' | 'habit';
   link?: string;
   completed?: boolean;
+  completedDates?: string[];
   recurrence?: 'none' | 'daily' | 'weekly';
   seriesId?: string;
 }

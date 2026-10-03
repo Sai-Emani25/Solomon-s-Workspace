@@ -13,10 +13,21 @@ const DailyTodo: React.FC = () => {
   const save = (next: CalendarItem[]) => { setItems(next); localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next)); window.dispatchEvent(new Event('solomon-calendar-updated')); };
   const load = () => { try { const saved = localStorage.getItem(CALENDAR_STORAGE_KEY); setItems(saved ? sanitizeCalendarItems(JSON.parse(saved)) : []); } catch { setItems([]); } };
   useEffect(() => { load(); window.addEventListener('solomon-calendar-updated', load); window.addEventListener('storage', load); return () => { window.removeEventListener('solomon-calendar-updated', load); window.removeEventListener('storage', load); }; }, []);
-  const todos = expandRecurringCalendarItems(items, today, today);
-  const overdue = items.filter((item) => item.date < today && !item.completed);
+  const todos = expandRecurringCalendarItems(items, today, today).filter((item) => !item.completed);
+  const overdue = items.filter((item) => item.date < today && item.recurrence === 'none' && !item.completed);
   const baseId = (id: string) => id.match(/^(.*)-\d{4}-\d{2}-\d{2}$/)?.[1] || id;
-  const toggle = (id: string) => save(sortCalendarItems(items.map((item) => item.id === baseId(id) ? { ...item, completed: !item.completed } : item)));
+  const toggle = (id: string) => {
+    const occurrenceId = baseId(id);
+    const occurrenceDate = id.match(/(\d{4}-\d{2}-\d{2})$/)?.[1] || today;
+    save(sortCalendarItems(items.flatMap((item) => {
+      if (item.id !== occurrenceId) return [item];
+      if (item.recurrence === 'daily' || item.recurrence === 'weekly') {
+        const completedDates = item.completedDates || [];
+        return [{ ...item, completedDates: completedDates.includes(occurrenceDate) ? completedDates.filter((date) => date !== occurrenceDate) : [...completedDates, occurrenceDate] }];
+      }
+      return [];
+    })));
+  };
   const moveToToday = (id: string) => save(sortCalendarItems(items.map((item) => item.id === baseId(id) ? { ...item, date: today, completed: false, recurrence: 'none' } : item)));
   const complete = todos.filter((item) => item.completed).length;
 

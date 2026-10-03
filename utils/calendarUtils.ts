@@ -94,6 +94,7 @@ export const expandRecurringCalendarItems = (
 ): CalendarItem[] => {
   const start = parseLocalDate(startDate);
   const end = parseLocalDate(endDate);
+  const today = parseLocalDate(formatDateInput(new Date()));
   const expanded: CalendarItem[] = [];
 
   items.forEach((item) => {
@@ -104,14 +105,21 @@ export const expandRecurringCalendarItems = (
       return;
     }
 
-    const cursor = new Date(Math.max(baseDate.getTime(), start.getTime()));
-    while (cursor.getTime() <= end.getTime()) {
-      const daysSinceStart = Math.round((cursor.getTime() - baseDate.getTime()) / 86400000);
-      if (daysSinceStart >= 0 && (recurrence === 'daily' || daysSinceStart % 7 === 0)) {
-        const occurrenceDate = formatDateInput(cursor);
-        expanded.push({ ...item, id: `${item.id}-${occurrenceDate}`, seriesId: item.id, date: occurrenceDate });
+    const cursor = new Date(Math.max(baseDate.getTime(), today.getTime(), start.getTime()));
+    if (recurrence === 'weekly') {
+      while (cursor.getDay() !== baseDate.getDay()) cursor.setDate(cursor.getDate() + 1);
+    }
+    if (cursor.getTime() <= end.getTime()) {
+      const occurrenceDate = formatDateInput(cursor);
+      if (!item.completedDates?.includes(occurrenceDate)) {
+        expanded.push({
+          ...item,
+          id: `${item.id}-${occurrenceDate}`,
+          seriesId: item.id,
+          date: occurrenceDate,
+          completed: false,
+        });
       }
-      cursor.setDate(cursor.getDate() + 1);
     }
   });
 
@@ -128,6 +136,7 @@ export const sanitizeCalendarItems = (items: CalendarItem[], now = new Date()): 
         title: item.title.trim(),
         time: /^([01]\d|2[0-3]):[0-5]\d$/.test(item.time || '') ? item.time : undefined,
         recurrence: item.recurrence === 'daily' || item.recurrence === 'weekly' ? item.recurrence : 'none',
+        completedDates: Array.isArray(item.completedDates) ? item.completedDates.filter((date): date is string => typeof date === 'string') : [],
         source: 'manual' as const,
         completed: Boolean(item.completed),
       }))
