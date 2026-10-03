@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Edit2, ExternalLink, Plus, Trash2, Trophy, X } from 'lucide-react';
-import { CalendarItem, Hackathon } from '../types';
+import { CalendarItem, Hackathon, Habit } from '../types';
 import {
   CALENDAR_MIN_DATE,
   CALENDAR_STORAGE_KEY,
   clampMonthToCalendarRange,
   formatDateInput,
+  expandRecurringCalendarItems,
   getCalendarMaxDate,
   isCalendarDateAllowed,
   parseLocalDate,
   sanitizeCalendarItems,
+  sanitizeHabits,
   sortCalendarItems,
   sortHackathonsByDeadline,
 } from '../utils/calendarUtils';
@@ -21,6 +23,21 @@ const colorClasses: Record<NonNullable<CalendarItem['color']>, string> = {
   rose: 'bg-rose-400 text-rose-950 border border-rose-300/70',
   blue: 'bg-sky-300 text-sky-950 border border-sky-400/70',
 };
+const invertedColorClasses: Record<NonNullable<CalendarItem['color']>, string> = {
+  slate: 'bg-slate-950 text-slate-100 border border-slate-500/70',
+  amber: 'bg-yellow-950 text-yellow-100 border border-yellow-400/70',
+  emerald: 'bg-green-950 text-green-100 border border-green-400/70',
+  rose: 'bg-orange-950 text-orange-100 border border-orange-500/70',
+  blue: 'bg-blue-950 text-sky-100 border border-sky-400/70',
+};
+const neonColorClasses: Record<NonNullable<CalendarItem['color']>, string> = {
+  slate: 'bg-slate-500 text-slate-950 border border-slate-200 shadow-lg shadow-slate-500/25',
+  amber: 'bg-orange-400 text-orange-950 border border-orange-200 shadow-lg shadow-orange-400/25',
+  emerald: 'bg-teal-400 text-teal-950 border border-teal-200 shadow-lg shadow-teal-400/25',
+  rose: 'bg-pink-500 text-pink-950 border border-pink-300 shadow-lg shadow-pink-500/25',
+  blue: 'bg-purple-500 text-purple-950 border border-purple-200 shadow-lg shadow-purple-500/25',
+};
+const dreamRainbowClass = 'bg-[linear-gradient(110deg,#ef4444,#f97316,#eab308,#22c55e,#06b6d4,#8b5cf6)] text-white border border-white/70 shadow-lg shadow-cyan-500/25';
 
 const priorityOptions = [
   { value: 'rose', label: 'Highly Imp' },
@@ -48,9 +65,11 @@ const SolomonOrderCalendar: React.FC = () => {
   const [manualItems, setManualItems] = useState<CalendarItem[]>([]);
   const [hasLoadedCalendar, setHasLoadedCalendar] = useState(false);
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [contentFilter, setContentFilter] = useState<'all' | 'tasks' | 'hackathons'>('all');
   const [draft, setDraft] = useState<{ title: string; date: string; time: string; color: CalendarItem['color'] }>({
     title: '',
     date: formatDateInput(clampMonthToCalendarRange(new Date())),
@@ -84,14 +103,25 @@ const SolomonOrderCalendar: React.FC = () => {
         console.error('Failed to parse hackathons for calendar', error);
       }
     };
+    const loadHabits = () => {
+      try {
+        const savedHabits = localStorage.getItem('solomon_habits');
+        setHabits(savedHabits ? sanitizeHabits(JSON.parse(savedHabits)) : []);
+      } catch (error) {
+        console.error('Failed to parse habits for calendar', error);
+      }
+    };
     loadCalendar();
     loadHackathons();
+    loadHabits();
     setHasLoadedCalendar(true);
     window.addEventListener('solomon-calendar-updated', loadCalendar);
     window.addEventListener('storage', loadCalendar);
+    window.addEventListener('solomon-habits-updated', loadHabits);
     return () => {
       window.removeEventListener('solomon-calendar-updated', loadCalendar);
       window.removeEventListener('storage', loadCalendar);
+      window.removeEventListener('solomon-habits-updated', loadHabits);
     };
   }, []);
 
@@ -112,20 +142,37 @@ const SolomonOrderCalendar: React.FC = () => {
         id: `hackathon-${hackathon.id}`,
         title: hackathon.name,
         date: hackathon.deadline,
+        time: hackathon.deadlineTime,
         color: hackathon.priority || 'slate',
         source: 'hackathon',
         link: hackathon.link,
       }));
+    const habitItems: CalendarItem[] = habits
+      .filter((habit) => habit.date && isCalendarDateAllowed(habit.date))
+      .map((habit, index) => ({
+        id: `habit-${habit.id}`,
+        title: habit.title,
+        date: habit.date as string,
+        color: ['rose', 'amber', 'emerald', 'blue'][index % 4] as CalendarItem['color'],
+        source: 'habit',
+        completed: habit.completed,
+      }));
 
-    return sortCalendarItems([...sanitizeCalendarItems(manualItems), ...hackathonItems]);
-  }, [hackathons, manualItems]);
+    const visibleStart = formatDateInput(getMonthDays(viewMonth)[0]);
+    const visibleEnd = formatDateInput(getMonthDays(viewMonth)[41]);
+    return sortCalendarItems([...expandRecurringCalendarItems(sanitizeCalendarItems(manualItems), visibleStart, visibleEnd), ...hackathonItems, ...habitItems]);
+  }, [hackathons, habits, manualItems, viewMonth]);
+
+  const visibleItems = useMemo(() => allItems.filter((item) =>
+    contentFilter === 'all' || (contentFilter === 'tasks' && item.source === 'manual') || (contentFilter === 'hackathons' && item.source === 'hackathon')
+  ), [allItems, contentFilter]);
 
   const itemsByDate = useMemo(() => {
-    return allItems.reduce<Record<string, CalendarItem[]>>((accumulator, item) => {
+    return visibleItems.reduce<Record<string, CalendarItem[]>>((accumulator, item) => {
       accumulator[item.date] = sortCalendarItems([...(accumulator[item.date] || []), item]);
       return accumulator;
     }, {});
-  }, [allItems]);
+  }, [visibleItems]);
 
   const visibleDays = useMemo(() => getMonthDays(viewMonth), [viewMonth]);
 
@@ -150,7 +197,7 @@ const SolomonOrderCalendar: React.FC = () => {
   const removeItem = (id: string) => {
     setManualItems((previous) => previous.filter((item) => item.id !== id));
   };
-  const editItem = (item: CalendarItem) => { setDraft({ title: item.title, date: item.date, time: item.time || '', color: item.color }); setEditingItemId(item.id); setExpandedDate(null); setIsAdding(true); };
+  const editItem = (item: CalendarItem) => { setDraft({ title: item.title, date: item.date, time: item.time || '', color: item.color }); setEditingItemId(item.seriesId || item.id); setExpandedDate(null); setIsAdding(true); };
 
   const moveMonth = (direction: -1 | 1) => {
     setViewMonth((previous) => clampMonthToCalendarRange(new Date(previous.getFullYear(), previous.getMonth() + direction, 1)));
@@ -165,6 +212,13 @@ const SolomonOrderCalendar: React.FC = () => {
       <div className="rounded-[24px] border border-amber-500/20 bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.08),_transparent_45%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))] p-3 shadow-2xl shadow-amber-950/20">
         <div className="rounded-[22px] border border-slate-800 bg-slate-950/80 p-2.5">
           <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
+            <div className="mr-auto flex items-center gap-2">
+              {(['all', 'tasks', 'hackathons'] as const).map((filter) => (
+                <button key={filter} onClick={() => setContentFilter(filter)} className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${contentFilter === filter ? 'bg-amber-400 text-slate-950' : 'border border-slate-700 bg-slate-900 text-slate-400 hover:text-white'}`}>
+                  {filter === 'all' ? 'All' : filter === 'tasks' ? 'Tasks' : 'Hackathons'}
+                </button>
+              ))}
+            </div>
             <div className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
               {CALENDAR_MIN_DATE} to {getCalendarMaxDate()}
             </div>
@@ -252,12 +306,12 @@ const SolomonOrderCalendar: React.FC = () => {
                     {items.slice(0, 2).map((item) => (
                       <div
                         key={item.id}
-                        className={`group flex h-[28px] flex-none flex-col justify-center overflow-hidden rounded-md px-1.5 py-1 text-[8px] font-bold leading-tight ${colorClasses[item.color]}`}
+                        className={`group flex h-[28px] flex-none flex-col justify-center overflow-hidden rounded-md px-1.5 py-1 text-[8px] font-bold leading-tight ${item.source === 'manual' ? neonColorClasses[item.color] : item.source === 'habit' ? dreamRainbowClass : colorClasses[item.color]}`}
                       >
                         <div className="flex items-start justify-between gap-1">
                           <div className="min-w-0">
                             <p className="truncate whitespace-nowrap">{item.title}</p>
-                            <div className="mt-0.5 flex min-w-0 items-center gap-1 overflow-hidden text-[7px] uppercase tracking-[0.1em] opacity-70">
+                            {item.source !== 'habit' && <div className="mt-0.5 flex min-w-0 items-center gap-1 overflow-hidden text-[7px] uppercase tracking-[0.1em] opacity-70">
                               {item.source === 'hackathon' && (
                                 <>
                                   <Trophy className="h-2 w-2 shrink-0" />
@@ -274,11 +328,11 @@ const SolomonOrderCalendar: React.FC = () => {
                                   {item.color === 'rose' ? 'Highly Imp' : item.color === 'amber' ? 'Priority' : item.color === 'emerald' ? 'Low Priority' : 'Casual'}
                                 </span>
                               )}
-                            </div>
+                            </div>}
                           </div>
                           {item.source === 'manual' && (
                             <button
-                              onClick={() => removeItem(item.id)}
+                              onClick={() => removeItem(item.seriesId || item.id)}
                               className="opacity-0 transition-opacity group-hover:opacity-100"
                               aria-label={`Remove ${item.title}`}
                             >
@@ -408,11 +462,11 @@ const SolomonOrderCalendar: React.FC = () => {
 
             <div className="max-h-[60vh] space-y-3 overflow-y-auto px-6 py-5 styled-scrollbar">
               {expandedItems.map((item) => (
-                <div key={item.id} className={`rounded-2xl p-4 ${colorClasses[item.color]}`}>
+                <div key={item.id} className={`rounded-2xl p-4 ${item.source === 'manual' ? neonColorClasses[item.color] : item.source === 'habit' ? dreamRainbowClass : colorClasses[item.color]}`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-sm font-black">{item.title}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] opacity-75">
+                      {item.source !== 'habit' && <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] opacity-75">
                         <span>{item.source === 'hackathon' ? 'Hackathon' : 'Manual Item'}</span>
                         {item.time && <span>{item.time}</span>}
                         {item.color === 'rose' && <span>Highly Imp</span>}
@@ -420,7 +474,7 @@ const SolomonOrderCalendar: React.FC = () => {
                         {item.color === 'emerald' && <span>Low Priority</span>}
                         {item.color === 'blue' && <span>Casual</span>}
                         {item.color === 'slate' && <span>Not Set</span>}
-                      </div>
+                      </div>}
                     </div>
 
                     <div className="flex items-center gap-2">

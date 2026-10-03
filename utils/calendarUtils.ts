@@ -1,4 +1,4 @@
-import { CalendarItem, Hackathon } from '../types';
+import { CalendarItem, Hackathon, Habit } from '../types';
 
 export const CALENDAR_STORAGE_KEY = 'solomon_order_calendar';
 export const CALENDAR_MIN_DATE = '2026-01-01';
@@ -60,7 +60,11 @@ export const normalizeHackathon = (hackathon: Hackathon): Hackathon => {
 export const sortHackathonsByDeadline = (hackathons: Hackathon[]): Hackathon[] =>
   [...hackathons]
     .map(normalizeHackathon)
-    .sort((left, right) => compareDateStrings(left.deadline, right.deadline));
+    .sort((left, right) => {
+      const dateDiff = compareDateStrings(left.deadline, right.deadline);
+      if (dateDiff !== 0) return dateDiff;
+      return (left.deadlineTime || '99:99').localeCompare(right.deadlineTime || '99:99');
+    });
 
 export const compareCalendarItemPriority = (left: CalendarItem['color'], right: CalendarItem['color']): number =>
   CALENDAR_ITEM_PRIORITY_WEIGHT[right] - CALENDAR_ITEM_PRIORITY_WEIGHT[left];
@@ -83,6 +87,37 @@ export const sortCalendarItems = (items: CalendarItem[]): CalendarItem[] =>
     return left.title.localeCompare(right.title);
   });
 
+export const expandRecurringCalendarItems = (
+  items: CalendarItem[],
+  startDate: string,
+  endDate: string,
+): CalendarItem[] => {
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
+  const expanded: CalendarItem[] = [];
+
+  items.forEach((item) => {
+    const recurrence = item.recurrence || 'none';
+    const baseDate = parseLocalDate(item.date);
+    if (recurrence === 'none' || baseDate.getTime() > end.getTime()) {
+      if (baseDate.getTime() >= start.getTime() && baseDate.getTime() <= end.getTime()) expanded.push(item);
+      return;
+    }
+
+    const cursor = new Date(Math.max(baseDate.getTime(), start.getTime()));
+    while (cursor.getTime() <= end.getTime()) {
+      const daysSinceStart = Math.round((cursor.getTime() - baseDate.getTime()) / 86400000);
+      if (daysSinceStart >= 0 && (recurrence === 'daily' || daysSinceStart % 7 === 0)) {
+        const occurrenceDate = formatDateInput(cursor);
+        expanded.push({ ...item, id: `${item.id}-${occurrenceDate}`, seriesId: item.id, date: occurrenceDate });
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  });
+
+  return sortCalendarItems(expanded);
+};
+
 export const sanitizeCalendarItems = (items: CalendarItem[], now = new Date()): CalendarItem[] =>
   sortCalendarItems(
     items
@@ -92,7 +127,26 @@ export const sanitizeCalendarItems = (items: CalendarItem[], now = new Date()): 
         ...item,
         title: item.title.trim(),
         time: /^([01]\d|2[0-3]):[0-5]\d$/.test(item.time || '') ? item.time : undefined,
+        recurrence: item.recurrence === 'daily' || item.recurrence === 'weekly' ? item.recurrence : 'none',
         source: 'manual' as const,
         completed: Boolean(item.completed),
       }))
   );
+
+const UNO_COLORS: Habit['color'][] = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+
+export const sanitizeHabits = (items: unknown): Habit[] => {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .map((item, index) => ({
+      id: typeof item.id === 'string' && item.id ? item.id : `dream-${Date.now()}-${index}`,
+      title: typeof item.title === 'string' ? item.title.trim() : '',
+      section: item.section === 'goal' ? 'goal' as const : 'bucket' as const,
+      color: UNO_COLORS.includes(item.color as Habit['color']) ? item.color as Habit['color'] : UNO_COLORS[index % UNO_COLORS.length],
+      date: typeof item.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.date) ? item.date : undefined,
+      completedOn: typeof item.completedOn === 'string' ? item.completedOn : item.completed ? formatDateInput(new Date()) : undefined,
+    }))
+    .filter((item) => Boolean(item.title));
+};

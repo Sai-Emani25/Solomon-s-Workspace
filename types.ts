@@ -37,6 +37,7 @@ export interface Hackathon {
   id: string;
   name: string;
   deadline: string;
+  deadlineTime?: string;
   link: string;
   platform: string;
   type: 'in-person' | 'virtual';
@@ -50,9 +51,25 @@ export interface CalendarItem {
   /** Local time in 24-hour HH:mm format. Tasks without a time sort after timed tasks. */
   time?: string;
   color: 'amber' | 'emerald' | 'rose' | 'blue' | 'slate';
-  source?: 'manual' | 'hackathon';
+  source?: 'manual' | 'hackathon' | 'habit';
   link?: string;
   completed?: boolean;
+  recurrence?: 'none' | 'daily' | 'weekly';
+  seriesId?: string;
+}
+
+export type HabitSection = 'bucket' | 'goal';
+export type UnoFlipColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple';
+
+export interface Habit {
+  id: string;
+  title: string;
+  section: HabitSection;
+  color: UnoFlipColor;
+  date?: string;
+  time?: string;
+  completed?: boolean;
+  completedOn?: string;
 }
 
 export interface StudyItem {
@@ -63,4 +80,4 @@ export interface StudyItem {
   topics: { id: string; name: string; completed: boolean; link?: string }[];
 }
 
-export type AppTab = 'hub' | 'tools' | 'hackathons' | 'study' | 'order' | 'daily';
+export type AppTab = 'hub' | 'tools' | 'hackathons' | 'study' | 'order' | 'daily' | 'habits';

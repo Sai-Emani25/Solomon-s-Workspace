@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, ListTodo, RotateCcw } from 'lucide-react';
 import { CalendarItem } from '../types';
-import { CALENDAR_STORAGE_KEY, formatDateInput, sanitizeCalendarItems, sortCalendarItems } from '../utils/calendarUtils';
+import { CALENDAR_STORAGE_KEY, expandRecurringCalendarItems, formatDateInput, sanitizeCalendarItems, sortCalendarItems } from '../utils/calendarUtils';
 
 const colors: Record<CalendarItem['color'], string> = {
-  rose: 'border-rose-500/35 bg-rose-500/10 text-rose-200', amber: 'border-amber-500/35 bg-amber-500/10 text-amber-200', emerald: 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200', blue: 'border-sky-500/35 bg-sky-500/10 text-sky-200', slate: 'border-slate-700 bg-slate-800 text-slate-200',
+  rose: 'border-pink-300 bg-pink-500 text-pink-950 shadow-lg shadow-pink-500/25', amber: 'border-orange-200 bg-orange-400 text-orange-950 shadow-lg shadow-orange-400/25', emerald: 'border-teal-200 bg-teal-400 text-teal-950 shadow-lg shadow-teal-400/25', blue: 'border-purple-200 bg-purple-500 text-purple-950 shadow-lg shadow-purple-500/25', slate: 'border-slate-200 bg-slate-500 text-slate-950 shadow-lg shadow-slate-500/25',
 };
 
 const DailyTodo: React.FC = () => {
@@ -13,10 +13,11 @@ const DailyTodo: React.FC = () => {
   const save = (next: CalendarItem[]) => { setItems(next); localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next)); window.dispatchEvent(new Event('solomon-calendar-updated')); };
   const load = () => { try { const saved = localStorage.getItem(CALENDAR_STORAGE_KEY); setItems(saved ? sanitizeCalendarItems(JSON.parse(saved)) : []); } catch { setItems([]); } };
   useEffect(() => { load(); window.addEventListener('solomon-calendar-updated', load); window.addEventListener('storage', load); return () => { window.removeEventListener('solomon-calendar-updated', load); window.removeEventListener('storage', load); }; }, []);
-  const todos = items.filter((item) => item.date === today);
+  const todos = expandRecurringCalendarItems(items, today, today);
   const overdue = items.filter((item) => item.date < today && !item.completed);
-  const toggle = (id: string) => save(sortCalendarItems(items.map((item) => item.id === id ? { ...item, completed: !item.completed } : item)));
-  const moveToToday = (id: string) => save(sortCalendarItems(items.map((item) => item.id === id ? { ...item, date: today, completed: false } : item)));
+  const baseId = (id: string) => id.match(/^(.*)-\d{4}-\d{2}-\d{2}$/)?.[1] || id;
+  const toggle = (id: string) => save(sortCalendarItems(items.map((item) => item.id === baseId(id) ? { ...item, completed: !item.completed } : item)));
+  const moveToToday = (id: string) => save(sortCalendarItems(items.map((item) => item.id === baseId(id) ? { ...item, date: today, completed: false, recurrence: 'none' } : item)));
   const complete = todos.filter((item) => item.completed).length;
 
   return <div className="mx-auto max-w-3xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">

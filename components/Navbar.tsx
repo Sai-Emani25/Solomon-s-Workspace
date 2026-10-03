@@ -2,7 +2,7 @@
 import React, { useRef } from 'react';
 import { Crown, Sparkles, Menu, Download, Upload } from 'lucide-react';
 import { CalendarItem, Hackathon } from '../types';
-import { sanitizeCalendarItems, sortHackathonsByDeadline } from '../utils/calendarUtils';
+import { sanitizeCalendarItems, sanitizeHabits, sortHackathonsByDeadline } from '../utils/calendarUtils';
 
 const BACKUP_VERSION = '3.0';
 const storageFields = [
@@ -10,15 +10,14 @@ const storageFields = [
   ['hackathons', 'solomon_hackathons'],
   ['orderCalendar', 'solomon_order_calendar'],
   ['studyData', 'solomon_study'],
+  ['habits', 'solomon_habits'],
   ['streakData', 'solomon_streak'],
 ] as const;
 
 type BackupPayload = Record<string, unknown> & { data?: Record<string, unknown> };
 
 const toStorageValue = (storageKey: string, value: unknown): string | null => {
-  if (typeof value === 'string') {
-    value = JSON.parse(value);
-  }
+  if (typeof value === 'string') value = JSON.parse(value);
   if (value === undefined || value === null) return null;
 
   if (storageKey === 'solomon_hackathons') {
@@ -28,6 +27,9 @@ const toStorageValue = (storageKey: string, value: unknown): string | null => {
   if (storageKey === 'solomon_order_calendar') {
     if (!Array.isArray(value)) throw new Error('The calendar tasks section is not a list.');
     return JSON.stringify(sanitizeCalendarItems(value as CalendarItem[]));
+  }
+  if (storageKey === 'solomon_habits') {
+    return JSON.stringify(sanitizeHabits(value));
   }
   return JSON.stringify(value);
 };
@@ -39,8 +41,12 @@ const readBackup = (payload: BackupPayload) => {
   storageFields.forEach(([backupKey, storageKey]) => {
     const value = source[backupKey];
     if (value === undefined || value === null) return;
-    const serialized = toStorageValue(storageKey, value);
-    if (serialized !== null) restored.push({ key: storageKey, value: serialized });
+    try {
+      const serialized = toStorageValue(storageKey, value);
+      if (serialized !== null) restored.push({ key: storageKey, value: serialized });
+    } catch (error) {
+      console.warn(`Skipped invalid ${backupKey} backup section`, error);
+    }
   });
 
   if (restored.length === 0) {

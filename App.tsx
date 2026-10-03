@@ -7,6 +7,7 @@ import HackathonTracker from './components/HackathonTracker';
 import StudyTracker from './components/StudyTracker';
 import SolomonOrderCalendar from './components/SolomonOrderCalendar';
 import DailyTodo from './components/DailyTodo';
+import HabitTracker from './components/HabitTracker';
 import { 
   Sparkles, 
   Globe, 
@@ -18,6 +19,7 @@ import {
   LayoutDashboard,
   CalendarDays
   ,ListTodo
+  ,Target
 } from 'lucide-react';
 import { AppTab } from './types';
 
@@ -28,11 +30,12 @@ const App: React.FC = () => {
   const isOrderTab = activeTab === 'order';
 
   const menuItems = [
-    { id: 'hackathons' as AppTab, label: 'Hackathon Track', icon: Trophy, color: 'text-amber-400' },
-    { id: 'order' as AppTab, label: "Solomon's Order", icon: CalendarDays, color: 'text-yellow-300' },
+    { id: 'hackathons' as AppTab, label: "Solomon's Order", icon: Trophy, color: 'text-amber-400' },
+    { id: 'order' as AppTab, label: 'Order Calendar', icon: CalendarDays, color: 'text-yellow-300' },
     { id: 'daily' as AppTab, label: 'Daily To-Do', icon: ListTodo, color: 'text-indigo-300' },
-    { id: 'study' as AppTab, label: 'Study Master', icon: BookOpen, color: 'text-blue-400' },
     { id: 'hub' as AppTab, label: 'Workspace Hub', icon: Globe, color: 'text-indigo-400' },
+    { id: 'study' as AppTab, label: 'Study Master', icon: BookOpen, color: 'text-blue-400' },
+    { id: 'habits' as AppTab, label: 'My Dreams', icon: Target, color: 'text-sky-300' },
     { id: 'tools' as AppTab, label: 'Utility Suite', icon: Settings2, color: 'text-purple-400' },
   ];
 
@@ -121,6 +124,7 @@ const App: React.FC = () => {
           {activeTab === 'hackathons' && <HackathonTracker />}
           {activeTab === 'order' && <SolomonOrderCalendar />}
           {activeTab === 'daily' && <DailyTodo />}
+          {activeTab === 'habits' && <HabitTracker />}
           {activeTab === 'study' && <StudyTracker />}
           {activeTab === 'tools' && (
             <div className="animate-in fade-in duration-700">
