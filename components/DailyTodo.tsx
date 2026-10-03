@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, ListTodo, RotateCcw } from 'lucide-react';
 import { CalendarItem } from '../types';
-import { CALENDAR_STORAGE_KEY, expandRecurringCalendarItems, formatDateInput, sanitizeCalendarItems, sortCalendarItems } from '../utils/calendarUtils';
+import { CALENDAR_STORAGE_KEY, expandRecurringCalendarItems, formatDateInput, getNextRecurringDate, sanitizeCalendarItems, sortCalendarItems } from '../utils/calendarUtils';
 
 const colors: Record<CalendarItem['color'], string> = {
   rose: 'border-pink-300 bg-pink-500 text-pink-950 shadow-lg shadow-pink-500/25', amber: 'border-orange-200 bg-orange-400 text-orange-950 shadow-lg shadow-orange-400/25', emerald: 'border-teal-200 bg-teal-400 text-teal-950 shadow-lg shadow-teal-400/25', blue: 'border-purple-200 bg-purple-500 text-purple-950 shadow-lg shadow-purple-500/25', slate: 'border-slate-200 bg-slate-500 text-slate-950 shadow-lg shadow-slate-500/25',
@@ -22,8 +22,7 @@ const DailyTodo: React.FC = () => {
     save(sortCalendarItems(items.flatMap((item) => {
       if (item.id !== occurrenceId) return [item];
       if (item.recurrence === 'daily' || item.recurrence === 'weekly') {
-        const completedDates = item.completedDates || [];
-        return [{ ...item, completedDates: completedDates.includes(occurrenceDate) ? completedDates.filter((date) => date !== occurrenceDate) : [...completedDates, occurrenceDate] }];
+        return [{ ...item, date: getNextRecurringDate(item), completed: false, completedDates: [] }];
       }
       return [];
     })));

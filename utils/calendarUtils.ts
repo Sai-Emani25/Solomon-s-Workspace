@@ -15,6 +15,12 @@ export const formatDateInput = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+export const getNextRecurringDate = (item: CalendarItem, from = new Date()): string => {
+  const next = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  next.setDate(next.getDate() + (item.recurrence === 'weekly' ? 7 : 1));
+  return formatDateInput(next);
+};
+
 export const compareDateStrings = (left: string, right: string): number =>
   parseLocalDate(left).getTime() - parseLocalDate(right).getTime();
 
